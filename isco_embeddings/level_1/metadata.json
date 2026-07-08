@@ -1,0 +1,42 @@
+{
+  "0": {
+    "title": "SIŁY ZBROJNE",
+    "skill_level": 0
+  },
+  "1": {
+    "title": "PRZEDSTAWICIELE WŁADZ PUBLICZNYCH, WYŻSI URZĘDNICY I KIEROWNICY",
+    "skill_level": 1
+  },
+  "2": {
+    "title": "SPECJALIŚCI",
+    "skill_level": 2
+  },
+  "3": {
+    "title": "TECHNICY I INNY ŚREDNI PERSONEL",
+    "skill_level": 3
+  },
+  "4": {
+    "title": "PRACOWNICY BIUROWI",
+    "skill_level": 4
+  },
+  "5": {
+    "title": "PRACOWNICY USŁUG I SPRZEDAWCY",
+    "skill_level": 5
+  },
+  "6": {
+    "title": "ROLNICY, OGRODNICY, LEŚNICY I RYBACY",
+    "skill_level": 6
+  },
+  "7": {
+    "title": "ROBOTNICY PRZEMYSŁOWI I RZEMIEŚLNICY",
+    "skill_level": 7
+  },
+  "8": {
+    "title": "OPERATORZY I MONTERZY MASZYN I URZĄDZEŃ",
+    "skill_level": 8
+  },
+  "9": {
+    "title": "PRACOWNICY PRZY PRACACH PROSTYCH",
+    "skill_level": 9
+  }
+}

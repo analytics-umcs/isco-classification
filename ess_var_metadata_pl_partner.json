@@ -1,0 +1,63 @@
+{
+  "B48": {
+    "label": null,
+    "value_labels": {}
+  },
+  "B49": {
+    "label": null,
+    "value_labels": {}
+  },
+  "B50": {
+    "label": null,
+    "value_labels": {}
+  },
+  "pdwrkp": {
+    "label": "Partner, ostatnie 7 dni: praca zarobkowa",
+    "value_labels": {
+      "0": "Niezaznaczone",
+      "1": "Zaznaczone"
+    }
+  },
+  "edctnp": {
+    "label": "Partner, ostatnie 7 dni: edukacja",
+    "value_labels": {
+      "0": "Niezaznaczone",
+      "1": "Zaznaczone"
+    }
+  },
+  "cmsrvp": {
+    "label": "Partner, ostatnie 7 dni: służba społeczna lub wojskowa",
+    "value_labels": {
+      "0": "Niezaznaczone",
+      "1": "Zaznaczone"
+    }
+  },
+  "hswrkp": {
+    "label": "Partner, ostatnie 7 dni: prace domowe, opieka nad dziećmi, innymi osobami",
+    "value_labels": {
+      "0": "Niezaznaczone",
+      "1": "Zaznaczone"
+    }
+  },
+  "emprelp": {
+    "label": "Rodzaj zatrudnienia partnera",
+    "value_labels": {
+      "1": "Pracownik najemny",
+      "2": "Samozatrudnienie",
+      "3": "Praca w rodzinnym biznesie",
+      "6": "Nie dotyczy",
+      "7": "Odmowa odpowiedzi",
+      "8": "Nie wiem",
+      "9": "Brak odpowiedzi"
+    }
+  },
+  "wkhtotp": {
+    "label": "Łączna liczba godzin przepracowanych w tygodniu w głównej pracy partnera (z nadgodzinami)",
+    "value_labels": {
+      "666": "Nie dotyczy",
+      "777": "Odmowa odpowiedzi",
+      "888": "Nie wiem",
+      "999": "Brak odpowiedzi"
+    }
+  }
+}

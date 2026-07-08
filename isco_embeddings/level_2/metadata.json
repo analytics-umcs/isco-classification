@@ -1,0 +1,174 @@
+{
+  "01": {
+    "title": "Oficerowie zawodowi Sił Zbrojnych",
+    "skill_level": 0
+  },
+  "02": {
+    "title": "Podoficerowie zawodowi Sił Zbrojnych",
+    "skill_level": 0
+  },
+  "03": {
+    "title": "Szeregowi zawodowi Sił Zbrojnych",
+    "skill_level": 0
+  },
+  "11": {
+    "title": "Przedstawiciele władz publicznych, wyżsi urzędnicy i dyrektorzy generalni",
+    "skill_level": 1
+  },
+  "12": {
+    "title": "Kierownicy do spraw zarządzania i handlu",
+    "skill_level": 1
+  },
+  "13": {
+    "title": "Kierownicy do spraw produkcji i usług",
+    "skill_level": 1
+  },
+  "14": {
+    "title": "Kierownicy w branży hotelarskiej, handlu i innych branżach usługowych",
+    "skill_level": 1
+  },
+  "21": {
+    "title": "Specjaliści nauk fizycznych, matematycznych i technicznych",
+    "skill_level": 2
+  },
+  "22": {
+    "title": "Specjaliści do spraw zdrowia",
+    "skill_level": 2
+  },
+  "23": {
+    "title": "Specjaliści nauczania i wychowania",
+    "skill_level": 2
+  },
+  "24": {
+    "title": "Specjaliści do spraw ekonomicznych i zarządzania",
+    "skill_level": 2
+  },
+  "25": {
+    "title": "Specjaliści do spraw technologii informacyjno-komunikacyjnych",
+    "skill_level": 2
+  },
+  "26": {
+    "title": "Specjaliści z dziedziny prawa, dziedzin społecznych i kultury",
+    "skill_level": 2
+  },
+  "31": {
+    "title": "Średni personel nauk fizycznych, chemicznych i technicznych",
+    "skill_level": 3
+  },
+  "32": {
+    "title": "Średni personel do spraw zdrowia",
+    "skill_level": 3
+  },
+  "33": {
+    "title": "Średni personel do spraw biznesu i administracji",
+    "skill_level": 3
+  },
+  "34": {
+    "title": "Średni personel z dziedziny prawa, spraw społecznych, kultury i pokrewny",
+    "skill_level": 3
+  },
+  "35": {
+    "title": "Technicy informatycy",
+    "skill_level": 3
+  },
+  "41": {
+    "title": "Sekretarki, operatorzy urządzeń biurowych i pokrewni",
+    "skill_level": 4
+  },
+  "42": {
+    "title": "Pracownicy obsługi klienta",
+    "skill_level": 4
+  },
+  "43": {
+    "title": "Pracownicy do spraw finansowo-statystycznych i ewidencji materiałowej",
+    "skill_level": 4
+  },
+  "44": {
+    "title": "Pozostali pracownicy obsługi biura",
+    "skill_level": 4
+  },
+  "51": {
+    "title": "Pracownicy usług osobistych",
+    "skill_level": 5
+  },
+  "52": {
+    "title": "Sprzedawcy i pokrewni",
+    "skill_level": 5
+  },
+  "53": {
+    "title": "Pracownicy opieki osobistej i pokrewni",
+    "skill_level": 5
+  },
+  "54": {
+    "title": "Pracownicy usług ochrony",
+    "skill_level": 5
+  },
+  "61": {
+    "title": "Rolnicy produkcji towarowej",
+    "skill_level": 6
+  },
+  "62": {
+    "title": "Leśnicy i rybacy",
+    "skill_level": 6
+  },
+  "63": {
+    "title": "Rolnicy i rybacy pracujący na własne potrzeby",
+    "skill_level": 6
+  },
+  "71": {
+    "title": "Robotnicy budowlani i pokrewni (z wyłączeniem elektryków)",
+    "skill_level": 7
+  },
+  "72": {
+    "title": "Robotnicy obróbki metali, mechanicy maszyn i urządzeń i pokrewni",
+    "skill_level": 7
+  },
+  "73": {
+    "title": "Rzemieślnicy i robotnicy poligraficzni",
+    "skill_level": 7
+  },
+  "74": {
+    "title": "Elektrycy i elektronicy",
+    "skill_level": 7
+  },
+  "75": {
+    "title": "Robotnicy w przetwórstwie spożywczym, obróbce drewna, produkcji wyrobów tekstylnych i pokrewni",
+    "skill_level": 7
+  },
+  "81": {
+    "title": "Operatorzy maszyn i urządzeń wydobywczych i przetwórczych",
+    "skill_level": 8
+  },
+  "82": {
+    "title": "Monterzy",
+    "skill_level": 8
+  },
+  "83": {
+    "title": "Kierowcy i operatorzy pojazdów",
+    "skill_level": 8
+  },
+  "91": {
+    "title": "Pomoce domowe i sprzątaczki",
+    "skill_level": 9
+  },
+  "92": {
+    "title": "Robotnicy pomocniczy w rolnictwie, leśnictwie i rybołówstwie",
+    "skill_level": 9
+  },
+  "93": {
+    "title": "Robotnicy pomocniczy w górnictwie, przemyśle, budownictwie i transporcie",
+    "skill_level": 9
+  },
+  "94": {
+    "title": "Pracownicy pomocniczy przygotowujący posiłki",
+    "skill_level": 9
+  },
+  "95": {
+    "title": "Sprzedawcy uliczni i pracownicy świadczący usługi na ulicach",
+    "skill_level": 9
+  },
+  "96": {
+    "title": "Ładowacze nieczystości i inni pracownicy przy pracach prostych",
+    "skill_level": 9
+  }
+}

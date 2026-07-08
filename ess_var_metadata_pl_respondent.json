@@ -1,0 +1,299 @@
+{
+  "idno": {
+    "label": "Numer identyfikacyjny respondenta",
+    "value_labels": {}
+  },
+  "B31": {
+    "label": null,
+    "value_labels": {}
+  },
+  "tporgwk": {
+    "label": "Rodzaj organizacji, w której respondent pracuje/pracował",
+    "value_labels": {
+      "1": "Administracja rządowa lub samorządowa",
+      "2": "Inny sektor publiczny (np. edukacja, zdrowie)",
+      "3": "Przedsiębiorstwo państwowe",
+      "4": "Firma prywatna",
+      "5": "Samozatrudnienie",
+      "6": "Inne",
+      "66": "Nie dotyczy",
+      "77": "Odmowa odpowiedzi",
+      "88": "Nie wiem",
+      "99": "Brak odpowiedzi"
+    }
+  },
+  "B33": {
+    "label": null,
+    "value_labels": {}
+  },
+  "B34": {
+    "label": null,
+    "value_labels": {}
+  },
+  "B35": {
+    "label": null,
+    "value_labels": {}
+  },
+  "gndr": {
+    "label": "Płeć respondenta",
+    "value_labels": {
+      "1": "Mężczyzna",
+      "2": "Kobieta",
+      "9": "Brak odpowiedzi"
+    }
+  },
+  "yrbrn": {
+    "label": "Rok urodzenia respondenta",
+    "value_labels": {
+      "7777": "Odmowa odpowiedzi",
+      "8888": "Nie wiem",
+      "9999": "Brak odpowiedzi"
+    }
+  },
+  "eduyrs": {
+    "label": "Liczba lat ukończonej edukacji w trybie stacjonarnym",
+    "value_labels": {
+      "77": "Odmowa odpowiedzi",
+      "88": "Nie wiem",
+      "99": "Brak odpowiedzi"
+    }
+  },
+  "pdwrk": {
+    "label": "Ostatnie 7 dni: praca zarobkowa",
+    "value_labels": {
+      "0": "Niezaznaczone",
+      "1": "Zaznaczone"
+    }
+  },
+  "edctn": {
+    "label": "Ostatnie 7 dni: edukacja",
+    "value_labels": {
+      "0": "Niezaznaczone",
+      "1": "Zaznaczone"
+    }
+  },
+  "cmsrv": {
+    "label": "Ostatnie 7 dni: służba społeczna lub wojskowa",
+    "value_labels": {
+      "0": "Niezaznaczone",
+      "1": "Zaznaczone"
+    }
+  },
+  "hswrk": {
+    "label": "Ostatnie 7 dni: prace domowe, opieka nad dziećmi, innymi osobami",
+    "value_labels": {
+      "0": "Niezaznaczone",
+      "1": "Zaznaczone"
+    }
+  },
+  "mainact": {
+    "label": "Główna aktywność w ostatnich 7 dniach",
+    "value_labels": {
+      "1": "Praca zarobkowa",
+      "2": "Edukacja",
+      "3": "Bezrobotny, poszukujący pracy",
+      "4": "Bezrobotny, nieposzukujący pracy",
+      "5": "Trwale chory lub niepełnosprawny",
+      "6": "Emeryt/rencista",
+      "7": "Służba społeczna lub wojskowa",
+      "8": "Prace domowe, opieka nad dziećmi, innymi osobami",
+      "9": "Inne",
+      "66": "Nie dotyczy",
+      "77": "Odmowa odpowiedzi",
+      "88": "Nie wiem",
+      "99": "Brak odpowiedzi"
+    }
+  },
+  "crpdwk": {
+    "label": "Kontrola: praca zarobkowa w ostatnich 7 dniach",
+    "value_labels": {
+      "1": "Tak",
+      "2": "Nie",
+      "6": "Nie dotyczy",
+      "7": "Odmowa odpowiedzi",
+      "8": "Nie wiem",
+      "9": "Brak odpowiedzi"
+    }
+  },
+  "emplrel": {
+    "label": "Rodzaj zatrudnienia",
+    "value_labels": {
+      "1": "Pracownik najemny",
+      "2": "Samozatrudnienie",
+      "3": "Praca w rodzinnym biznesie",
+      "6": "Nie dotyczy",
+      "7": "Odmowa odpowiedzi",
+      "8": "Nie wiem",
+      "9": "Brak odpowiedzi"
+    }
+  },
+  "emplno": {
+    "label": "Liczba pracowników zatrudnianych/zatrudnionych przez respondenta",
+    "value_labels": {
+      "66666": "Nie dotyczy",
+      "77777": "Odmowa odpowiedzi",
+      "88888": "Nie wiem",
+      "99999": "Brak odpowiedzi"
+    }
+  },
+  "wrkctrb": {
+    "label": "Umowa o pracę na czas nieokreślony lub określony",
+    "value_labels": {
+      "1": "Na czas nieokreślony",
+      "2": "Na czas określony",
+      "3": "Brak umowy",
+      "6": "Nie dotyczy",
+      "7": "Odmowa odpowiedzi",
+      "8": "Nie wiem",
+      "9": "Brak odpowiedzi"
+    }
+  },
+  "estsz": {
+    "label": "Wielkość zakładu pracy",
+    "value_labels": {
+      "1": "Poniżej 10",
+      "2": "10 do 24",
+      "3": "25 do 99",
+      "4": "100 do 499",
+      "5": "500 lub więcej",
+      "6": "Nie dotyczy",
+      "7": "Odmowa odpowiedzi",
+      "8": "Nie wiem",
+      "9": "Brak odpowiedzi"
+    }
+  },
+  "jbspv": {
+    "label": "Odpowiedzialność za nadzór nad innymi pracownikami",
+    "value_labels": {
+      "1": "Tak",
+      "2": "Nie",
+      "6": "Nie dotyczy",
+      "7": "Odmowa odpowiedzi",
+      "8": "Nie wiem",
+      "9": "Brak odpowiedzi"
+    }
+  },
+  "njbspv": {
+    "label": "Liczba osób podległych respondentowi w pracy",
+    "value_labels": {
+      "66666": "Nie dotyczy",
+      "77777": "Odmowa odpowiedzi",
+      "88888": "Nie wiem",
+      "99999": "Brak odpowiedzi"
+    }
+  },
+  "wkdcorga": {
+    "label": "Możliwość decydowania o organizacji codziennej pracy",
+    "value_labels": {
+      "0": "Nie mam/nie miałem wpływu",
+      "1": "1",
+      "2": "2",
+      "3": "3",
+      "4": "4",
+      "5": "5",
+      "6": "6",
+      "7": "7",
+      "8": "8",
+      "9": "9",
+      "10": "Mam/miałem pełną kontrolę",
+      "66": "Nie dotyczy",
+      "77": "Odmowa odpowiedzi",
+      "88": "Nie wiem",
+      "99": "Brak odpowiedzi"
+    }
+  },
+  "iorgact": {
+    "label": "Możliwość wpływu na decyzje dotyczące działalności organizacji",
+    "value_labels": {
+      "0": "Nie mam/nie miałem wpływu",
+      "1": "1",
+      "2": "2",
+      "3": "3",
+      "4": "4",
+      "5": "5",
+      "6": "6",
+      "7": "7",
+      "8": "8",
+      "9": "9",
+      "10": "Mam/miałem pełną kontrolę",
+      "66": "Nie dotyczy",
+      "77": "Odmowa odpowiedzi",
+      "88": "Nie wiem",
+      "99": "Brak odpowiedzi"
+    }
+  },
+  "wkhct": {
+    "label": "Łączna liczba godzin umownych w tygodniu w głównej pracy (bez nadgodzin)",
+    "value_labels": {
+      "555": "Brak ustalonej podstawowej/umownej liczby godzin",
+      "666": "Nie dotyczy",
+      "777": "Odmowa odpowiedzi",
+      "888": "Nie wiem",
+      "999": "Brak odpowiedzi"
+    }
+  },
+  "wkhtot": {
+    "label": "Łączna liczba godzin faktycznie przepracowanych w tygodniu w głównej pracy (z nadgodzinami)",
+    "value_labels": {
+      "666": "Nie dotyczy",
+      "777": "Odmowa odpowiedzi",
+      "888": "Nie wiem",
+      "999": "Brak odpowiedzi"
+    }
+  },
+  "hincsrca": {
+    "label": "Główne źródło dochodu gospodarstwa domowego",
+    "value_labels": {
+      "1": "Wynagrodzenie za pracę",
+      "2": "Dochód z samozatrudnienia (bez rolnictwa)",
+      "3": "Dochód z rolnictwa",
+      "4": "Emerytury/renty",
+      "5": "Zasiłek dla bezrobotnych/odprawa",
+      "6": "Inne świadczenia lub dotacje socjalne",
+      "7": "Dochód z inwestycji, oszczędności itp.",
+      "8": "Dochód z innych źródeł",
+      "77": "Odmowa odpowiedzi",
+      "88": "Nie wiem",
+      "99": "Brak odpowiedzi"
+    }
+  },
+  "hincfilt": {
+    "label": "Dochód: tygodniowy/miesięczny/roczny",
+    "value_labels": {
+      "1": "Tygodniowy",
+      "2": "Miesięczny",
+      "3": "Roczny",
+      "9": "Brak odpowiedzi"
+    }
+  },
+  "hinctnta": {
+    "label": "Łączny dochód netto gospodarstwa domowego ze wszystkich źródeł",
+    "value_labels": {
+      "1": "J - 1. decyl",
+      "2": "R - 2. decyl",
+      "3": "C - 3. decyl",
+      "4": "M - 4. decyl",
+      "5": "F - 5. decyl",
+      "6": "S - 6. decyl",
+      "7": "K - 7. decyl",
+      "8": "P - 8. decyl",
+      "9": "D - 9. decyl",
+      "10": "H - 10. decyl",
+      "77": "Odmowa odpowiedzi",
+      "88": "Nie wiem",
+      "99": "Brak odpowiedzi"
+    }
+  },
+  "hincfel": {
+    "label": "Odczucie odnośnie dochodu gospodarstwa domowego obecnie",
+    "value_labels": {
+      "1": "Życie wygodne przy obecnym dochodzie",
+      "2": "Radzenie sobie przy obecnym dochodzie",
+      "3": "Trudności przy obecnym dochodzie",
+      "4": "Duże trudności przy obecnym dochodzie",
+      "7": "Odmowa odpowiedzi",
+      "8": "Nie wiem",
+      "9": "Brak odpowiedzi"
+    }
+  }
+}
