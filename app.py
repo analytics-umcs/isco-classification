@@ -1280,11 +1280,11 @@ def render_pa_top10_step(df, idx: int, row, prefix: str, df_state_key: str, idx_
     # Ocena pomocności listy 10 dopasowanych kodów - wymagana zawsze, niezależnie
     # od tego, czy koder wybierze jeden z nich, czy przejdzie do kodowania
     # kaskadowego (patrz przycisk "Kontynuuj kodowanie kaskadowo" niżej).
-    ai_helpfulness = st.slider(
-        "Jak pomocne było 10 dopasowanych kodów?",
-        min_value=1,
-        max_value=5,
-        value=3,
+    ai_helpfulness = st.radio(
+        "Jak pomocne były dopasowane kody? (1-5 punktów)",
+        options=[1, 2, 3, 4, 5],
+        index=2,
+        horizontal=True,
         key=f"pa_top10_ai_helpfulness_{idx}",
     )
 
@@ -2346,11 +2346,11 @@ def render_classify_hitl():
     # Ocena pomocności listy 10 dopasowanych kodów - wymagana zawsze, niezależnie
     # od tego, czy koder wybierze jeden z nich, czy przejdzie do kodowania
     # kaskadowego (patrz przycisk "Zakoduj od zera" niżej).
-    ai_helpfulness = st.slider(
-        "Jak pomocne było 10 dopasowanych kodów?",
-        min_value=1,
-        max_value=5,
-        value=3,
+    ai_helpfulness = st.radio(
+        "Jak pomocne były dopasowane kody? (1-5 punktów)",
+        options=[1, 2, 3, 4, 5],
+        index=2,
+        horizontal=True,
         key=f"hitl_ai_helpfulness_{idx}",
     )
 
