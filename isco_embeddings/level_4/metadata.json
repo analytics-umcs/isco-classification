@@ -1,1746 +1,2182 @@
 {
   "0110": {
     "title": "Oficerowie zawodowi Sił Zbrojnych",
-    "skill_level": 0
+    "skill_level": 0,
+    "title_en": "Commissioned Armed Forces Officers"
   },
   "0210": {
     "title": "Podoficerowie zawodowi Sił Zbrojnych",
-    "skill_level": 0
+    "skill_level": 0,
+    "title_en": "Non-commissioned Armed Forces Officers"
   },
   "0310": {
     "title": "Szeregowi zawodowi Sił Zbrojnych",
-    "skill_level": 0
+    "skill_level": 0,
+    "title_en": "Armed Forces Occupations, Other Ranks"
   },
   "1111": {
     "title": "Przedstawiciele władz publicznych",
-    "skill_level": 1
+    "skill_level": 1,
+    "title_en": "Legislators"
   },
   "1112": {
     "title": "Wyżsi urzędnicy administracji publicznej",
-    "skill_level": 1
+    "skill_level": 1,
+    "title_en": "Senior Government Officials"
   },
   "1113": {
     "title": "Wyżsi urzędnicy władz samorządowych",
-    "skill_level": 1
+    "skill_level": 1,
+    "title_en": "Traditional Chiefs and Heads of Villages"
   },
   "1114": {
     "title": "Zawodowi działacze organizacji członkowskich",
-    "skill_level": 1
+    "skill_level": 1,
+    "title_en": "Senior Officials of Special-interest Organizations"
   },
   "1120": {
     "title": "Dyrektorzy generalni i wykonawczy",
-    "skill_level": 1
+    "skill_level": 1,
+    "title_en": "Managing Directors and Chief Executives"
   },
   "1211": {
     "title": "Kierownicy do spraw finansowych",
-    "skill_level": 1
+    "skill_level": 1,
+    "title_en": "Finance Managers"
   },
   "1212": {
     "title": "Kierownicy do spraw zarządzania zasobami ludzkimi",
-    "skill_level": 1
+    "skill_level": 1,
+    "title_en": "Human Resource Managers"
   },
   "1213": {
     "title": "Kierownicy do spraw strategicznych i planowania",
-    "skill_level": 1
+    "skill_level": 1,
+    "title_en": "Policy and Planning Managers"
   },
   "1219": {
     "title": "Kierownicy do spraw obsługi biznesu i zarządzania gdzie indziej niesklasyfikowani",
-    "skill_level": 1
+    "skill_level": 1,
+    "title_en": "Business Services and Administration Managers Not Elsewhere Classified"
   },
   "1221": {
     "title": "Kierownicy do spraw marketingu i sprzedaży",
-    "skill_level": 1
+    "skill_level": 1,
+    "title_en": "Sales and Marketing Managers"
   },
   "1222": {
     "title": "Kierownicy do spraw reklamy i public relations",
-    "skill_level": 1
+    "skill_level": 1,
+    "title_en": "Advertising and Public Relations Managers"
   },
   "1223": {
     "title": "Kierownicy do spraw badań i rozwoju",
-    "skill_level": 1
+    "skill_level": 1,
+    "title_en": "Research and Development Managers"
   },
   "1311": {
     "title": "Kierownicy produkcji w rolnictwie i leśnictwie",
-    "skill_level": 1
+    "skill_level": 1,
+    "title_en": "Agricultural and Forestry Production Managers"
   },
   "1312": {
     "title": "Kierownicy produkcji w uprawach wodnych i rybołówstwie",
-    "skill_level": 1
+    "skill_level": 1,
+    "title_en": "Aquaculture and Fisheries Production Managers"
   },
   "1321": {
     "title": "Kierownicy do spraw produkcji przemysłowej",
-    "skill_level": 1
+    "skill_level": 1,
+    "title_en": "Manufacturing Managers"
   },
   "1322": {
     "title": "Kierownicy w górnictwie",
-    "skill_level": 1
+    "skill_level": 1,
+    "title_en": "Mining Managers"
   },
   "1323": {
     "title": "Kierownicy do spraw budownictwa",
-    "skill_level": 1
+    "skill_level": 1,
+    "title_en": "Construction Managers"
   },
   "1324": {
     "title": "Kierownicy do spraw logistyki i pokrewni",
-    "skill_level": 1
+    "skill_level": 1,
+    "title_en": "Supply, Distribution and Related Managers"
   },
   "1330": {
     "title": "Kierownicy do spraw technologii informatycznych i telekomunikacyjnych",
-    "skill_level": 1
+    "skill_level": 1,
+    "title_en": "Information and Communications Technology Service Managers"
   },
   "1341": {
     "title": "Kierownicy w instytucjach opieki nad dziećmi",
-    "skill_level": 1
+    "skill_level": 1,
+    "title_en": "Child Care Service Managers"
   },
   "1342": {
     "title": "Kierownicy w instytucjach opieki zdrowotnej",
-    "skill_level": 1
+    "skill_level": 1,
+    "title_en": "Health Service Managers"
   },
   "1343": {
     "title": "Kierownicy w instytucjach opieki nad osobami starszymi",
-    "skill_level": 1
+    "skill_level": 1,
+    "title_en": "Aged Care Service Managers"
   },
   "1344": {
     "title": "Kierownicy w instytucjach opieki społecznej",
-    "skill_level": 1
+    "skill_level": 1,
+    "title_en": "Social Welfare Managers"
   },
   "1345": {
     "title": "Kierownicy w instytucjach edukacyjnych",
-    "skill_level": 1
+    "skill_level": 1,
+    "title_en": "Education Managers"
   },
   "1346": {
     "title": "Kierownicy w instytucjach finansowych i ubezpieczeniowych",
-    "skill_level": 1
+    "skill_level": 1,
+    "title_en": "Financial and Insurance Services Branch managers"
   },
   "1349": {
     "title": "Kierownicy w instytucjach usług wyspecjalizowanych gdzie indziej niesklasyfikowani",
-    "skill_level": 1
+    "skill_level": 1,
+    "title_en": "Professional Services Managers Not Elsewhere Classified"
   },
   "1411": {
     "title": "Kierownicy w hotelarstwie",
-    "skill_level": 1
+    "skill_level": 1,
+    "title_en": "Hotel Managers"
   },
   "1412": {
     "title": "Kierownicy w gastronomii",
-    "skill_level": 1
+    "skill_level": 1,
+    "title_en": "Restaurant Managers"
   },
   "1420": {
     "title": "Kierownicy w handlu detalicznym i hurtowym",
-    "skill_level": 1
+    "skill_level": 1,
+    "title_en": "Retail and Wholesale Trade Managers"
   },
   "1431": {
     "title": "Kierownicy do spraw sportu, rekreacji i kultury",
-    "skill_level": 1
+    "skill_level": 1,
+    "title_en": "Sports, Recreation and Cultural Centre Managers"
   },
   "1439": {
     "title": "Kierownicy do spraw innych typów usług gdzie indziej niesklasyfikowani",
-    "skill_level": 1
+    "skill_level": 1,
+    "title_en": "Services Managers Not Elsewhere Classified"
   },
   "2111": {
     "title": "Fizycy i astronomowie",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Physicists and Astronomers"
   },
   "2112": {
     "title": "Meteorolodzy",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Meteorologists"
   },
   "2113": {
     "title": "Chemicy",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Chemists"
   },
   "2114": {
     "title": "Specjaliści nauk o Ziemi",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Geologists and geophysicists"
   },
   "2120": {
     "title": "Matematycy, statystycy i pokrewni",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Mathematicians, Actuaries and Statisticians"
   },
   "2131": {
     "title": "Biolodzy i pokrewni",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Biologists, Botanists, Zoologists and Related Professionals"
   },
   "2132": {
     "title": "Specjaliści w zakresie rolnictwa, leśnictwa i pokrewni",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Farming, Forestry and Fisheries Advisers"
   },
   "2133": {
     "title": "Specjaliści do spraw ochrony środowiska",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Environmental Protection Professionals"
   },
   "2141": {
     "title": "Inżynierowie do spraw przemysłu i produkcji",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Industrial and Production Engineers"
   },
   "2142": {
     "title": "Inżynierowie budownictwa",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Civil Engineers"
   },
   "2143": {
     "title": "Inżynierowie inżynierii środowiska",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Environmental Engineers"
   },
   "2144": {
     "title": "Inżynierowie mechanicy",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Mechanical Engineers"
   },
   "2145": {
     "title": "Inżynierowie chemicy i pokrewni",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Chemical Engineers"
   },
   "2146": {
     "title": "Inżynierowie górnictwa, metalurgii i pokrewni",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Mining Engineers, Metallurgists and Related Professionals"
   },
   "2149": {
     "title": "Inżynierowie i pokrewni gdzie indziej niesklasyfikowani",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Engineering Professionals Not Elsewhere Classified"
   },
   "2151": {
     "title": "Inżynierowie elektrycy",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Electrical Engineers"
   },
   "2152": {
     "title": "Inżynierowie elektronicy",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Electronics Engineers"
   },
   "2153": {
     "title": "Inżynierowie telekomunikacji",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Telecommunications Engineers"
   },
   "2161": {
     "title": "Architekci",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Building Architects"
   },
   "2162": {
     "title": "Architekcie krajobrazu",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Landscape Architects"
   },
   "2163": {
     "title": "Projektanci wzornictwa przemysłowego i odzieży",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Product and Garment Designers"
   },
   "2164": {
     "title": "Urbaniści i inżynierowie ruchu drogowego",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Town and Traffic Planners"
   },
   "2165": {
     "title": "Kartografowie i geodeci",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Cartographers and Surveyors"
   },
   "2166": {
     "title": "Projektanci grafiki i multimediów",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Graphic and Multimedia Designers"
   },
   "2211": {
     "title": "Lekarze bez specjalizacji lub w trakcie specjalizacji",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Generalist Medical Practitioners"
   },
   "2212": {
     "title": "Lekarze specjaliści",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Specialist Medical Practitioners"
   },
   "2221": {
     "title": "Pielęgniarki bez specjalizacji lub w trakcie specjalizacji",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Nursing Professionals"
   },
   "2222": {
     "title": "Pielęgniarki specjalistki",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Midwifery Professionals"
   },
   "2230": {
     "title": "Specjaliści medycyny tradycyjnej i komplementarnej",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Traditional and Complementary Medicine Professionals"
   },
   "2240": {
     "title": "Specjaliści ratownictwa medycznego",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Paramedical Practitioners"
   },
   "2250": {
     "title": "Lekarze weterynarii",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Veterinarians"
   },
   "2261": {
     "title": "Lekarze dentyści bez specjalizacji lub w trakcie specjalizacji",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Dentists"
   },
   "2262": {
     "title": "Lekarze dentyści specjaliści",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Pharmacists"
   },
   "2263": {
     "title": "Specjaliści do spraw zdrowia środowiskowego i higieny pracy",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Environmental and Occupational Health and Hygiene Professionals"
   },
   "2264": {
     "title": "Fizjoterapeuci",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Physiotherapists"
   },
   "2265": {
     "title": "Dietetycy i specjaliści do spraw żywienia",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Dieticians and Nutritionists"
   },
   "2266": {
     "title": "Audiolodzy i logopedzi",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Audiologists and Speech Therapists"
   },
   "2267": {
     "title": "Optometryści i optycy okularowi",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Optometrists and Ophthalmic Opticians"
   },
   "2269": {
     "title": "Pozostali specjaliści ochrony zdrowia niesklasyfikowani gdzie indziej",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Health Professionals Not Elsewhere Classified"
   },
   "2310": {
     "title": "Nauczyciele akademiccy",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "University and Higher Education Teachers"
   },
   "2320": {
     "title": "Nauczyciele kształcenia zawodowego",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Vocational Education Teachers"
   },
   "2330": {
     "title": "Nauczyciele szkół ponadpodstawowych (z wyjątkiem nauczycieli kształcenia zawodowego)",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Secondary Education Teachers"
   },
   "2341": {
     "title": "Nauczyciele szkół podstawowych",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Primary School Teachers"
   },
   "2342": {
     "title": "Specjaliści do spraw wychowania małego dziecka",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Early Childhood Educators"
   },
   "2351": {
     "title": "Wizytatorzy i specjaliści metod nauczania",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Education Methods Specialists"
   },
   "2352": {
     "title": "Nauczyciele pracujący z osobami o specjalnych potrzebach edukacyjnych",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Special Needs Teachers"
   },
   "2353": {
     "title": "Lektorzy języków obcych",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Other Language Teachers"
   },
   "2354": {
     "title": "Nauczyciele muzyki w placówkach pozaszkolnych",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Other Music Teachers"
   },
   "2355": {
     "title": "Nauczyciele sztuki w placówkach pozaszkolnych",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Other Arts Teachers"
   },
   "2356": {
     "title": "Instruktorzy technologii informatycznych",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Information Technology Trainers"
   },
   "2359": {
     "title": "Specjaliści nauczania i wychowania gdzie indziej niesklasyfikowani",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Teaching Professionals Not Elsewhere Classified"
   },
   "2411": {
     "title": "Specjaliści do spraw księgowości i rachunkowości",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Accountants"
   },
   "2412": {
     "title": "Doradcy finansowi i inwestycyjni",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Financial and Investment Advisers"
   },
   "2413": {
     "title": "Analitycy finansowi",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Financial Analysts"
   },
   "2421": {
     "title": "Specjaliści do spraw zarządzania i organizacji",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Management and Organization Analysts"
   },
   "2422": {
     "title": "Specjaliści do spraw administracji i rozwoju",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Policy Administration Professionals"
   },
   "2423": {
     "title": "Specjaliści do spraw zarządzania zasobami ludzkimi",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Personnel and Careers Professionals"
   },
   "2424": {
     "title": "Specjaliści do spraw szkoleń zawodowych i rozwoju kadr",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Training and Staff Development Professionals"
   },
   "2431": {
     "title": "Specjaliści do spraw reklamy i marketingu",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Advertising and Marketing Professionals"
   },
   "2432": {
     "title": "Specjaliści do spraw public relations",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Public Relations Professionals"
   },
   "2433": {
     "title": "Specjaliści do spraw sprzedaży (z wyłączeniem technologii informacyjno- komunikacyjnych)",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Technical and Medical Sales Professionals (excluding ICT)"
   },
   "2434": {
     "title": "Specjaliści do spraw sprzedaży z dziedziny technologii teleinformatycznych",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Information and Communications Technology Sales Professionals"
   },
   "2511": {
     "title": "Analitycy systemowi",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Systems Analysts"
   },
   "2512": {
     "title": "Specjaliści do spraw rozwoju systemów informatycznych",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Software Developers"
   },
   "2513": {
     "title": "Projektanci aplikacji sieciowych i multimediów",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Web and Multimedia Developers"
   },
   "2514": {
     "title": "Programiści aplikacji",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Applications Programmers"
   },
   "2519": {
     "title": "Analitycy systemowi i specjaliści do spraw rozwoju aplikacji komputerowych gdzie indziej niesklasyfikowani",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Software and Applications Developers and Analysts Not Elsewhere Classified"
   },
   "2521": {
     "title": "Projektanci i administratorzy baz danych",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Database Designers and Administrators"
   },
   "2522": {
     "title": "Administratorzy systemów komputerowych",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Systems Aministrators"
   },
   "2523": {
     "title": "Specjaliści do spraw sieci komputerowych",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Computer Network Professionals"
   },
   "2529": {
     "title": "Specjaliści do spraw baz danych i sieci komputerowych gdzie indziej niesklasyfikowani",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Database and Network Professionals Not Elsewhere Classified"
   },
   "2611": {
     "title": "Adwokaci, radcy prawni i prokuratorzy",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Lawyers"
   },
   "2612": {
     "title": "Sędziowie",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Judges"
   },
   "2619": {
     "title": "Specjaliści z dziedziny prawa gdzie indziej niesklasyfikowani",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Legal Professionals Not Elsewhere Classified"
   },
   "2621": {
     "title": "Archiwiści i muzealnicy",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Archivists and Curators"
   },
   "2622": {
     "title": "Bibliotekoznawcy i specjaliści zarządzania informacją",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Librarians and Related Information Professionals"
   },
   "2631": {
     "title": "Ekonomiści",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Economists"
   },
   "2632": {
     "title": "Archeolodzy, socjolodzy i pokrewni",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Sociologists, Anthropologists and Related Professionals"
   },
   "2633": {
     "title": "Filozofowie, historycy i politolodzy",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Philosophers, Historians and Political Scientists"
   },
   "2634": {
     "title": "Psycholodzy i pokrewni",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Psychologists"
   },
   "2635": {
     "title": "Specjaliści do spraw społecznych",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Social Work and Counselling Professionals"
   },
   "2636": {
     "title": "Specjaliści do spraw religii",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Religious Professionals"
   },
   "2641": {
     "title": "Literaci i inni autorzy tekstów",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Authors and Related Writers"
   },
   "2642": {
     "title": "Dziennikarze",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Journalists"
   },
   "2643": {
     "title": "Filolodzy i tłumacze",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Translators, Interpreters and Other Linguists"
   },
   "2651": {
     "title": "Artyści plastycy",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Visual Artists"
   },
   "2652": {
     "title": "Kompozytorzy, artyści muzycy i śpiewacy",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Musicians, Singers and Composers"
   },
   "2653": {
     "title": "Choreografowie i tancerze",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Dancers and Choreographers"
   },
   "2654": {
     "title": "Producenci filmowi, reżyserzy i pokrewni",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Film, Stage and Related Directors and Producers"
   },
   "2655": {
     "title": "Aktorzy",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Actors"
   },
   "2656": {
     "title": "Prezenterzy radiowi, telewizyjni i pokrewni",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Announcers on Radio, Television and Other Media"
   },
   "2659": {
     "title": "Twórcy i artyści gdzie indziej niesklasyfikowani",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Creative and Performing Artists Not Elsewhere Classified"
   },
   "3111": {
     "title": "Technicy nauk chemicznych, fizycznych i pokrewni",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Chemical and Physical Science Technicians"
   },
   "3112": {
     "title": "Technicy budownictwa",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Civil Engineering Technicians"
   },
   "3113": {
     "title": "Technicy elektrycy",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Electrical Engineering Technicians"
   },
   "3114": {
     "title": "Technicy elektronicy i pokrewni",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Electronics Engineering Technicians"
   },
   "3115": {
     "title": "Technicy mechanicy",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Mechanical Engineering Technicians"
   },
   "3116": {
     "title": "Technicy chemicy i pokrewni",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Chemical Engineering Technicians"
   },
   "3117": {
     "title": "Technicy górnictwa, metalurgii i pokrewni",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Mining and metallurgical technicians"
   },
   "3118": {
     "title": "Kreślarze",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Draughtspersons"
   },
   "3119": {
     "title": "Technicy nauk fizycznych i technicznych gdzie indziej niesklasyfikowani",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Physical and Engineering Science Technicians Not Elsewhere Classified"
   },
   "3121": {
     "title": "Mistrzowie produkcji w górnictwie",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Mining Supervisors"
   },
   "3122": {
     "title": "Mistrzowie produkcji w przemyśle przetwórczym",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Manufacturing Supervisors"
   },
   "3123": {
     "title": "Mistrzowie produkcji w budownictwie",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Construction Supervisors"
   },
   "3131": {
     "title": "Operatorzy urządzeń energetycznych",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Power Production Plant Operators"
   },
   "3132": {
     "title": "Operatorzy urządzeń do spalania odpadów, uzdatniania wody i pokrewni",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Incinerator and Water Treatment Plant Operators"
   },
   "3133": {
     "title": "Kontrolerzy (sterowniczy) procesów w przemyśle chemicznym",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Chemical Processing Plant Controllers"
   },
   "3134": {
     "title": "Kontrolerzy (sterowniczy) procesów przeróbki ropy naftowej i gazu",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Petroleum and Natural Gas Refining Plant Operators"
   },
   "3135": {
     "title": "Kontrolerzy (sterowniczy) procesów metalurgicznych",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Metal Production Process Controllers"
   },
   "3139": {
     "title": "Kontrolerzy (sterowniczy) procesów przemysłowych gdzie indziej niesklasyfikowani",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Process Control Technicians Not Elsewhere Classified"
   },
   "3141": {
     "title": "Technicy nauk biologicznych (z wyłączeniem nauk medycznych)",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Life Science Technicians (excluding Medical)"
   },
   "3142": {
     "title": "Technicy rolnictwa i pokrewni",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Agricultural Technicians"
   },
   "3143": {
     "title": "Technicy leśnictwa",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Forestry Technicians"
   },
   "3151": {
     "title": "Pracownicy służb technicznych żeglugi",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Ships' Engineers"
   },
   "3152": {
     "title": "Oficerowie pokładowi, piloci żeglugi i pokrewni",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Ships' Deck Officers and Pilots"
   },
   "3153": {
     "title": "Piloci statków powietrznych i personel pokrewny",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Aircraft Pilots and Related Associate Professionals"
   },
   "3154": {
     "title": "Kontrolerzy ruchu lotniczego i pokrewni",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Air Traffic Controllers"
   },
   "3155": {
     "title": "Technicy urządzeń ruchu lotniczego",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Air Traffic Safety Electronics Technicians"
   },
   "3211": {
     "title": "Operatorzy aparatury medycznej",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Medical Imaging and Therapeutic Equipment Technicians"
   },
   "3212": {
     "title": "Technicy analityki medycznej",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Medical and Pathology Laboratory Technicians"
   },
   "3213": {
     "title": "Technicy farmaceutyczni",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Pharmaceutical Technicians and Assistants"
   },
   "3214": {
     "title": "Technicy medyczni i dentystyczni",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Medical and Dental Prosthetic Technicians"
   },
   "3221": {
     "title": "Pracownicy średniego personelu pielęgniarskiego",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Nursing Associate Professionals"
   },
   "3222": {
     "title": "Pracownicy średniego personelu położniczego",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Midwifery Associate Professionals"
   },
   "3230": {
     "title": "Praktykujący niekonwencjonalne lub komplementarne metody terapii",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Traditional and Complementary Medicine Associate Professionals"
   },
   "3240": {
     "title": "Technicy weterynarii",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Veterinary Technicians and Assistants"
   },
   "3251": {
     "title": "Asystenci dentystyczni",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Dental Assistants and Therapists"
   },
   "3252": {
     "title": "Środowiskowi pracownicy ochrony zdrowia",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Medical Records and Health Information Technicians"
   },
   "3253": {
     "title": "Optycy okularowi",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Community Health Workers"
   },
   "3254": {
     "title": "Technicy fizjoterapii i masażyści",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Dispensing Opticians"
   },
   "3255": {
     "title": "Średni personel ochrony środowiska, medycyny pracy i bhp",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Physiotherapy Technicians and Assistants"
   },
   "3256": {
     "title": "Ratownicy medyczni",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Medical Assistants"
   },
   "3257": {
     "title": "Inspektorzy i pracownicy średniego personelu do spraw zdrowia środowiskowego oraz higieny pracy",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Environmental and Occupational Health Inspectors and Associates"
   },
   "3258": {
     "title": "Pracownicy zespołów ratownictwa medycznego",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Ambulance Workers"
   },
   "3259": {
     "title": "Średni personel do spraw zdrowia gdzie indziej niesklasyfikowany",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Health Associate Professionals Not Elsewhere Classified"
   },
   "3311": {
     "title": "Dealerzy i maklerzy aktywów finansowych",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Securities and Finance Dealers and Brokers"
   },
   "3312": {
     "title": "Pracownicy do spraw kredytów, pożyczek i pokrewni",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Credit and Loans Officers"
   },
   "3313": {
     "title": "Księgowi",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Accounting Associate Professionals"
   },
   "3314": {
     "title": "Średni personel do spraw statystyki i dziedzin pokrewnych",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Statistical, Mathematical and Related Associate Professionals"
   },
   "3315": {
     "title": "Rzeczoznawcy (z wyłączeniem majątkowych)",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Valuers and Loss Assessors"
   },
   "3321": {
     "title": "Agenci ubezpieczeniowi",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Insurance Representatives"
   },
   "3322": {
     "title": "Przedstawiciele handlowi",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Commercial Sales Representatives"
   },
   "3323": {
     "title": "Zaopatrzeniowcy",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Buyers"
   },
   "3324": {
     "title": "Pośrednicy handlowi",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Trade Brokers"
   },
   "3331": {
     "title": "Spedytorzy i pokrewni",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Clearing and Forwarding Aents"
   },
   "3332": {
     "title": "Organizatorzy konferencji i imprez",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Conference and Event Planners"
   },
   "3333": {
     "title": "Pośrednicy pracy i zatrudnienia",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Employment agents and contractors"
   },
   "3334": {
     "title": "Agenci do spraw rynku nieruchomości",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Real Estate Agents and Property Managers"
   },
   "3339": {
     "title": "Pośrednicy usług biznesowych gdzie indziej niesklasyfikowani",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Business Services Agents Not Elsewhere Classified"
   },
   "3341": {
     "title": "Kierownicy biura",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Office Supervisors"
   },
   "3342": {
     "title": "Sekretarze sądowi",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Legal Secretaries"
   },
   "3343": {
     "title": "Pracownicy administracyjni i sekretarze biura zarządu",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Administrative and Executive Secretaries"
   },
   "3344": {
     "title": "Sekretarze medyczni i pokrewni",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Medical Secretaries"
   },
   "3351": {
     "title": "Funkcjonariusze celni i ochrony granic",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Customs and Border Inspectors"
   },
   "3352": {
     "title": "Urzędnicy do spraw podatków",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Government Tax and Excise Officials"
   },
   "3353": {
     "title": "Urzędnicy do spraw świadczeń społecznych",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Government Social Benefits Officials"
   },
   "3354": {
     "title": "Urzędnicy organów udzielających licencji",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Government Licensing Officials"
   },
   "3355": {
     "title": "Policjanci służby kryminalnej",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Police Inspectors and Detectives"
   },
   "3359": {
     "title": "Urzędnicy państwowi do spraw nadzoru gdzie indziej niesklasyfikowani",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Government Regulatory AssociatePprofessionals Not Elsewhere Classified"
   },
   "3411": {
     "title": "Średni personel z dziedziny prawa i pokrewny",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Legal and Related Associate Professionals"
   },
   "3412": {
     "title": "Pracownicy pomocy społecznej i pracy socjalnej",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Social Work Associate Professionals"
   },
   "3413": {
     "title": "Pracownicy z zakresu działalności religijnej",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Religious Associate Professionals"
   },
   "3421": {
     "title": "Sportowcy i pokrewni",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Athletes and Sports Players"
   },
   "3422": {
     "title": "Trenerzy, instruktorzy i działacze sportowi",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Sports Coaches, Instructors and Officials"
   },
   "3423": {
     "title": "Instruktorzy fitness i rekreacji ruchowej",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Fitness and Recreation Instructors and Programme Leaders"
   },
   "3431": {
     "title": "Fotografowie",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Photographers"
   },
   "3432": {
     "title": "Plastycy, dekoratorzy wnętrz i pokrewni",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Interior Designers and Decorators"
   },
   "3433": {
     "title": "Pracownicy bibliotek, galerii, muzeów i informacji naukowej",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Gallery, Museum and Library Technicians"
   },
   "3434": {
     "title": "Szefowie kuchni i organizatorzy usług gastronomicznych",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Chefs"
   },
   "3435": {
     "title": "Aktorzy cyrkowi i pokrewni",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Other Artistic and Cultural Associate Professionals"
   },
   "3511": {
     "title": "Operatorzy urządzeń teleinformatycznych",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Information and Communications Technology Operations Technicians"
   },
   "3512": {
     "title": "Technicy wsparcia informatycznego i technicznego",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Information and Communications Technology User Support Technicians"
   },
   "3513": {
     "title": "Operatorzy sieci i systemów komputerowych",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Computer Network and Systems Technicians"
   },
   "3514": {
     "title": "Technicy sieci internetowych",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Web Technicians"
   },
   "3521": {
     "title": "Operatorzy urządzeń do rejestracji i transmisji obrazu i dźwięku",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Broadcasting and Audio-visual Technicians"
   },
   "3522": {
     "title": "Operatorzy urządzeń telekomunikacyjnych",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Telecommunications Engineering Technicians"
   },
   "4110": {
     "title": "Pracownicy obsługi biurowej",
-    "skill_level": 4
+    "skill_level": 4,
+    "title_en": "General Office Clerks"
   },
   "4120": {
     "title": "Sekretarki (ogólne)",
-    "skill_level": 4
+    "skill_level": 4,
+    "title_en": "Secretaries (general)"
   },
   "4131": {
     "title": "Operatorzy edytorów tekstu",
-    "skill_level": 4
+    "skill_level": 4,
+    "title_en": "Typists and Word Processing Operators"
   },
   "4132": {
     "title": "Operatorzy wprowadzania danych",
-    "skill_level": 4
+    "skill_level": 4,
+    "title_en": "Data Entry Clerks"
   },
   "4211": {
     "title": "Kasjerzy bankowi i pokrewni",
-    "skill_level": 4
+    "skill_level": 4,
+    "title_en": "Bank Tellers and Related Clerks"
   },
   "4212": {
     "title": "Bukmacherzy, krupierzy i pokrewni",
-    "skill_level": 4
+    "skill_level": 4,
+    "title_en": "Bookmakers, Croupiers and Related Gaming Workers"
   },
   "4213": {
     "title": "Pracownicy lombardów i instytucji pożyczkowych",
-    "skill_level": 4
+    "skill_level": 4,
+    "title_en": "Pawnbrokers and Money-lenders"
   },
   "4214": {
     "title": "Windykatorzy i pokrewni",
-    "skill_level": 4
+    "skill_level": 4,
+    "title_en": "Debt Collectors and Related Workers"
   },
   "4221": {
     "title": "Konsultanci i inni pracownicy biur podróży",
-    "skill_level": 4
+    "skill_level": 4,
+    "title_en": "Travel Consultants and Clerks"
   },
   "4222": {
     "title": "Pracownicy centrów obsługi telefonicznej (pracownicy call center)",
-    "skill_level": 4
+    "skill_level": 4,
+    "title_en": "Contact Centre Information Clerks"
   },
   "4223": {
     "title": "Operatorzy centrali telefonicznych",
-    "skill_level": 4
+    "skill_level": 4,
+    "title_en": "Telephone Switchboard Operators"
   },
   "4224": {
     "title": "Recepcjoniści hotelowi",
-    "skill_level": 4
+    "skill_level": 4,
+    "title_en": "Hotel Receptionists"
   },
   "4225": {
     "title": "Pracownicy biur informacji",
-    "skill_level": 4
+    "skill_level": 4,
+    "title_en": "Inquiry Clerks"
   },
   "4226": {
     "title": "Recepcjoniści (z wyłączeniem hotelowych)",
-    "skill_level": 4
+    "skill_level": 4,
+    "title_en": "Receptionists (general)"
   },
   "4227": {
     "title": "Ankieterzy",
-    "skill_level": 4
+    "skill_level": 4,
+    "title_en": "Survey and Market Research Interviewers"
   },
   "4229": {
     "title": "Pozostali pracownicy do spraw obsługi i informacji klientów niesklasyfikowani gdzie indziej",
-    "skill_level": 4
+    "skill_level": 4,
+    "title_en": "Client Information Workers Not Elsewhere Classified"
   },
   "4311": {
     "title": "Pracownicy do spraw rachunkowości i księgowości",
-    "skill_level": 4
+    "skill_level": 4,
+    "title_en": "Accounting and Bookkeeping Clerks"
   },
   "4312": {
     "title": "Pracownicy do spraw statystyki, finansów i ubezpieczeń",
-    "skill_level": 4
+    "skill_level": 4,
+    "title_en": "Statistical, Finance and Insurance Clerks"
   },
   "4313": {
     "title": "Pracownicy obsługi płacowej",
-    "skill_level": 4
+    "skill_level": 4,
+    "title_en": "Payroll Clerks"
   },
   "4321": {
     "title": "Magazynierzy i pokrewni",
-    "skill_level": 4
+    "skill_level": 4,
+    "title_en": "Stock Clerks"
   },
   "4322": {
     "title": "Planiści produkcyjni",
-    "skill_level": 4
+    "skill_level": 4,
+    "title_en": "Production Clerks"
   },
   "4323": {
     "title": "Pracownicy do spraw transportu",
-    "skill_level": 4
+    "skill_level": 4,
+    "title_en": "Transport Clerks"
   },
   "4411": {
     "title": "Pomocnicy biblioteczni",
-    "skill_level": 4
+    "skill_level": 4,
+    "title_en": "Library Clerks"
   },
   "4412": {
     "title": "Listonosze i pokrewni",
-    "skill_level": 4
+    "skill_level": 4,
+    "title_en": "Mail Carriers and Sorting Clerks"
   },
   "4413": {
     "title": "Kodowacze, korektorzy i pokrewni",
-    "skill_level": 4
+    "skill_level": 4,
+    "title_en": "Coding, Proofreading and Related Clerks"
   },
   "4414": {
     "title": "Technicy archiwiści i pokrewni",
-    "skill_level": 4
+    "skill_level": 4,
+    "title_en": "Scribes and Related Workers"
   },
   "4415": {
     "title": "Pracownicy działów kadr",
-    "skill_level": 4
+    "skill_level": 4,
+    "title_en": "Filing and Copying Clerks"
   },
   "4416": {
     "title": "Pracownicy do spraw kadr",
-    "skill_level": 4
+    "skill_level": 4,
+    "title_en": "Personnel Clerks"
   },
   "4419": {
     "title": "Pracownicy obsługi biura gdzie indziej niesklasyfikowani",
-    "skill_level": 4
+    "skill_level": 4,
+    "title_en": "Clerical Support Workers Not Elsewhere Classified"
   },
   "5111": {
     "title": "Stewardzi",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Travel Attendants and Travel Stewards"
   },
   "5112": {
     "title": "Konduktorzy i pokrewni",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Transport Conductors"
   },
   "5113": {
     "title": "Przewodnicy turystyczni i piloci wycieczek",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Travel Guides"
   },
   "5120": {
     "title": "Kucharze",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Cooks"
   },
   "5131": {
     "title": "Kelnerzy",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Waiters"
   },
   "5132": {
     "title": "Barmani",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Bartenders"
   },
   "5141": {
     "title": "Fryzjerzy",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Hairdressers"
   },
   "5142": {
     "title": "Kosmetyczki i pokrewni",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Beauticians and Related Workers"
   },
   "5151": {
     "title": "Pracownicy obsługi technicznej biur, hoteli i innych obiektów",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Cleaning and Housekeeping Supervisors in Offices, Hotels and Other Establishments"
   },
   "5152": {
     "title": "Pracownicy usług domowych",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Domestic Housekeepers"
   },
   "5153": {
     "title": "Gospodarze budynków",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Building Caretakers"
   },
   "5161": {
     "title": "Astrolodzy, wróżbici i pokrewni",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Astrologers, Fortune-tellers and Related Workers"
   },
   "5162": {
     "title": "Osoby do towarzystwa",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Companions and Valets"
   },
   "5163": {
     "title": "Pracownicy zakładów pogrzebowych",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Undertakers and Embalmers"
   },
   "5164": {
     "title": "Opiekunowie zwierząt i pracownicy zajmujący się zwierzętami",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Pet Groomers and Animal Care Workers"
   },
   "5165": {
     "title": "Instruktorzy nauki jazdy",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Driving Instructors"
   },
   "5169": {
     "title": "Pracownicy usług osobistych gdzie indziej niesklasyfikowani",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Personal Services Workers Not Elsewhere Classified"
   },
   "5211": {
     "title": "Sprzedawcy na targowiskach i bazarach",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Stall and Market Salespersons"
   },
   "5212": {
     "title": "Sprzedawcy uliczni żywności",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Street Food Salespersons"
   },
   "5221": {
     "title": "Właściciele sklepów",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Shopkeepers"
   },
   "5222": {
     "title": "Kierownicy sprzedaży w marketach",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Shop Supervisors"
   },
   "5223": {
     "title": "Sprzedawcy sklepowi (ekspedienci)",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Shop Sales Assistants"
   },
   "5230": {
     "title": "Kasjerzy i sprzedawcy biletów",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Cashiers and Ticket Clerks"
   },
   "5241": {
     "title": "Modelki i modele",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Fashion and Other Models"
   },
   "5242": {
     "title": "Demonstratorzy wyrobów",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Sales Demonstrators"
   },
   "5243": {
     "title": "Agenci sprzedaży bezpośredniej",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Door-to-door Salespersons"
   },
   "5244": {
     "title": "Sprzedawcy (konsultanci) w centrach sprzedaży telefonicznej/internetowej",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Contact Centre Salespersons"
   },
   "5245": {
     "title": "Pracownicy stacji obsługi pojazdów",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Service Station Attendants"
   },
   "5246": {
     "title": "Wydawcy posiłków",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Food Service Counter Attendants"
   },
   "5249": {
     "title": "Pracownicy sprzedaży i pokrewni gdzie indziej niesklasyfikowani",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Sales Workers Not Elsewhere Classified"
   },
   "5311": {
     "title": "Opiekunowie dziecięcy",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Child Care Workers"
   },
   "5312": {
     "title": "Asystenci nauczycieli",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Teachers' Aides"
   },
   "5321": {
     "title": "Pomocniczy personel medyczny",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Health Care Assistants"
   },
   "5322": {
     "title": "Pracownicy domowej opieki osobistej",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Home-based Personal Care Workers"
   },
   "5329": {
     "title": "Pracownicy opieki osobistej w ochronie zdrowia i pokrewni gdzie indziej niesklasyfikowani",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Personal Care Workers in Health Services Not Elsewhere Classified"
   },
   "5411": {
     "title": "Strażacy",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Fire Fighters"
   },
   "5412": {
     "title": "Strażnicy w zakładach dla nieletnich",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Police Officers"
   },
   "5413": {
     "title": "Pracownicy ochrony osób i mienia",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Prison Guards"
   },
   "5414": {
     "title": "Pracownicy ochrony",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Security Guards"
   },
   "5419": {
     "title": "Pracownicy usług ochrony gdzie indziej niesklasyfikowani",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Protective Services Workers Not Elsewhere Classified"
   },
   "6111": {
     "title": "Rolnicy upraw polowych",
-    "skill_level": 6
+    "skill_level": 6,
+    "title_en": "Field Crop and Vegetable Growers"
   },
   "6112": {
     "title": "Sadownicy",
-    "skill_level": 6
+    "skill_level": 6,
+    "title_en": "Tree and Shrub Crop Growers"
   },
   "6113": {
     "title": "Ogrodnicy",
-    "skill_level": 6
+    "skill_level": 6,
+    "title_en": "Gardeners, Horticultural and Nursery Growers"
   },
   "6114": {
     "title": "Rolnicy upraw mieszanych",
-    "skill_level": 6
+    "skill_level": 6,
+    "title_en": "Mixed Crop Growers"
   },
   "6121": {
     "title": "Hodowcy wyspecjalizowanej produkcji zwierzęcej",
-    "skill_level": 6
+    "skill_level": 6,
+    "title_en": "Livestock and Dairy Producers"
   },
   "6122": {
     "title": "Hodowcy drobiu",
-    "skill_level": 6
+    "skill_level": 6,
+    "title_en": "Poultry Producers"
   },
   "6123": {
     "title": "Pszczelarze i hodowcy jedwabników",
-    "skill_level": 6
+    "skill_level": 6,
+    "title_en": "Apiarists and Sericulturists"
   },
   "6129": {
     "title": "Hodowcy zwierząt gdzie indziej niesklasyfikowani",
-    "skill_level": 6
+    "skill_level": 6,
+    "title_en": "Animal Producers Not Elsewhere Classified"
   },
   "6130": {
     "title": "Rolnicy produkcji roślinnej i zwierzęcej",
-    "skill_level": 6
+    "skill_level": 6,
+    "title_en": "Mixed Crop and Animal Producers"
   },
   "6210": {
     "title": "Robotnicy leśni i pokrewni",
-    "skill_level": 6
+    "skill_level": 6,
+    "title_en": "Forestry and Related Workers"
   },
   "6221": {
     "title": "Hodowcy ryb",
-    "skill_level": 6
+    "skill_level": 6,
+    "title_en": "Aquaculture Workers"
   },
   "6222": {
     "title": "Rybacy śródlądowi",
-    "skill_level": 6
+    "skill_level": 6,
+    "title_en": "Inland and Coastal Waters Fishery Workers"
   },
   "6223": {
     "title": "Rybacy morscy",
-    "skill_level": 6
+    "skill_level": 6,
+    "title_en": "Deep-sea Fishery Workers"
   },
   "6224": {
     "title": "Myśliwi i traperzy",
-    "skill_level": 6
+    "skill_level": 6,
+    "title_en": "Hunters and Trappers"
   },
   "6310": {
     "title": "Rolnicy produkcji roślinnej pracujący na własne potrzeby",
-    "skill_level": 6
+    "skill_level": 6,
+    "title_en": "Subsistence Crop Farmers"
   },
   "6320": {
     "title": "Hodowcy zwierząt pracujący na własne potrzeby",
-    "skill_level": 6
+    "skill_level": 6,
+    "title_en": "Subsistence Livestock Farmers"
   },
   "6330": {
     "title": "Rolnicy produkcji roślinnej i zwierzęcej pracujący na własne potrzeby",
-    "skill_level": 6
+    "skill_level": 6,
+    "title_en": "Subsistence Mixed Crop and Livestock Farmers"
   },
   "6340": {
     "title": "Rybacy i zbieracze pracujący na własne potrzeby",
-    "skill_level": 6
+    "skill_level": 6,
+    "title_en": "Subsistence Fishers, Hunters, Trappers and Gatherers"
   },
   "7111": {
     "title": "Monterzy konstrukcji budowlanych i konserwatorzy budynków",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "House Builders"
   },
   "7112": {
     "title": "Murarze i pokrewni",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Bricklayers and Related Workers"
   },
   "7113": {
     "title": "Robotnicy obróbki kamienia",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Stonemasons, Stone Cutters, Splitters and Carvers"
   },
   "7114": {
     "title": "Betoniarze, betoniarze zbrojarze i pokrewni",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Concrete Placers, Concrete Finishers and Related Workers"
   },
   "7115": {
     "title": "Cieśle i stolarze budowlani",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Carpenters and Joiners"
   },
   "7119": {
     "title": "Robotnicy robót stanu surowego i pokrewni gdzie indziej niesklasyfikowani",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Building Frame and Related Trades Workers Not Elsewhere Classified"
   },
   "7121": {
     "title": "Dekarze",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Roofers"
   },
   "7122": {
     "title": "Posadzkarze, parkieciarze i glazurnicy",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Floor Layers and Tile Setters"
   },
   "7123": {
     "title": "Tynkarze i pokrewni",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Plasterers"
   },
   "7124": {
     "title": "Monterzy izolacji",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Insulation Workers"
   },
   "7125": {
     "title": "Szklarze",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Glaziers"
   },
   "7126": {
     "title": "Hydraulicy i monterzy instalacji sanitarnych",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Plumbers and Pipe Fitters"
   },
   "7127": {
     "title": "Monterzy instalacji klimatyzacyjnych i chłodniczych",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Air Conditioning and Refrigeration Mechanics"
   },
   "7131": {
     "title": "Malarze i pokrewni",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Painters and Related Workers"
   },
   "7132": {
     "title": "Lakiernicy",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Spray Painters and Varnishers"
   },
   "7133": {
     "title": "Robotnicy czyszczący konstrukcje budowlane i pokrewni",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Building Structure Cleaners"
   },
   "7211": {
     "title": "Formierze odlewniczy i pokrewni",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Metal Moulders and Coremakers"
   },
   "7212": {
     "title": "Spawacze i pokrewni",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Welders and Flame Cutters"
   },
   "7213": {
     "title": "Blacharze",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Sheet Metal Workers"
   },
   "7214": {
     "title": "Robotnicy przygotowujący i wznoszący konstrukcje metalowe",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Structural Metal Preparers and Erectors"
   },
   "7215": {
     "title": "Takielarze i monterzy konstrukcji linowych",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Riggers and Cable Splicers"
   },
   "7221": {
     "title": "Kowale i operatorzy pras kuźniczych",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Blacksmiths, Hammersmiths and Forging Press Workers"
   },
   "7222": {
     "title": "Ślusarze i pokrewni",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Toolmakers and Related Workers"
   },
   "7223": {
     "title": "Ustawiacze i operatorzy obrabiarek do metali i pokrewni",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Metal Working Machine Tool Setters and  Operators"
   },
   "7224": {
     "title": "Szlifierze narzędzi i polerowacze metali",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Metal Polishers, Wheel Grinders and Tool Sharpeners"
   },
   "7231": {
     "title": "Mechanicy pojazdów samochodowych",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Motor Vehicle Mechanics and Repairers"
   },
   "7232": {
     "title": "Mechanicy statków powietrznych i pokrewni",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Aircraft Engine Mechanics and Repairers"
   },
   "7233": {
     "title": "Mechanicy maszyn i urządzeń rolniczych i przemysłowych",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Agricultural and Industrial Machinery Mechanics and Repairers"
   },
   "7234": {
     "title": "Mechanicy pojazdów jednośladowych",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Bicycle and Related Repairers"
   },
   "7311": {
     "title": "Mechanicy precyzyjni",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Precision-instrument Makers and Repairers"
   },
   "7312": {
     "title": "Monterzy instrumentów muzycznych",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Musical Instrument Makers and Tuners"
   },
   "7313": {
     "title": "Jubilerzy, złotnicy i pokrewni",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Jewellery and Precious Metal Workers"
   },
   "7314": {
     "title": "Ceramicy i pokrewni",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Potters and Related Workers"
   },
   "7315": {
     "title": "Wytwórcy, szlifierze, grawerzy i wykańczacze wyrobów szklanych",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Glass Makers, Cutters, Grinders and Finishers"
   },
   "7316": {
     "title": "Szyldziarze, grawerzy i zdobnicy ceramiki, szkła i pokrewni",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Sign Writers, Decorative Painters, Engravers and Etchers"
   },
   "7317": {
     "title": "Rękodzielnicy wyrobów z drewna i pokrewnych materiałów",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Handicraft Workers in Wood, Basketry and Related Materials"
   },
   "7318": {
     "title": "Rękodzielnicy wyrobów z tkanin, skóry i pokrewnych materiałów",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Handicraft Workers in Textile, Leather and Related Materials"
   },
   "7319": {
     "title": "Rzemieślnicy gdzie indziej niesklasyfikowani",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Handicraft Workers Not Elsewhere Classified"
   },
   "7321": {
     "title": "Pracownicy przy pracach przygotowawczych do druku",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Pre-press Technicians"
   },
   "7322": {
     "title": "Drukarze",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Printers"
   },
   "7323": {
     "title": "Introligatorzy i pokrewni",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Print Finishing and Binding Workers"
   },
   "7411": {
     "title": "Elektrycy budowlani i pokrewni",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Building and Related Electricians"
   },
   "7412": {
     "title": "Elektromechanicy i elektromonterzy",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Electrical Mechanics and Fitters"
   },
   "7413": {
     "title": "Monterzy linii elektrycznych",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Electrical Line Installers and Repairers"
   },
   "7421": {
     "title": "Monterzy i serwisanci urządzeń elektronicznych",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Electronics Mechanics and Servicers"
   },
   "7422": {
     "title": "Monterzy i serwisanci sieci, instalacji i urządzeń telekomunikacyjnych",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Information and Communications Technology Installers and Servicers"
   },
   "7511": {
     "title": "Masarze, robotnicy w przetwórstwie ryb i pokrewni",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Butchers, Fishmongers and Related Food Preparers"
   },
   "7512": {
     "title": "Piekarze, cukiernicy i pokrewni",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Bakers, Pastry-cooks and Confectionery Makers"
   },
   "7513": {
     "title": "Robotnicy w produkcji wyrobów mleczarskich",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Dairy Products Makers"
   },
   "7514": {
     "title": "Robotnicy przetwórstwa surowców roślinnych",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Fruit, Vegetable and Related Preservers"
   },
   "7515": {
     "title": "Klasyfikatorzy żywności i pokrewni",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Food and Beverage Tasters and Graders"
   },
   "7516": {
     "title": "Przygotowujący tytoń i wytwórcy wyrobów tytoniowych",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Tobacco Preparers and Tobacco Products Makers"
   },
   "7521": {
     "title": "Robotnicy przygotowujący drewno i pokrewni",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Wood Treaters"
   },
   "7522": {
     "title": "Stolarze meblowi i pokrewni",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Cabinet-makers and Related Workers"
   },
   "7523": {
     "title": "Ustawiacze i operatorzy maszyn do obróbki i produkcji wyrobów z drewna",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Woodworking Machine Tool Setters and Operators"
   },
   "7531": {
     "title": "Krawcy, kuśnierze, kapelusznicy i pokrewni",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Tailors, Dressmakers, Furriers and Hatters"
   },
   "7532": {
     "title": "Konstruktorzy i krojczowie odzieży",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Garment and Related Patternmakers and Cutters"
   },
   "7533": {
     "title": "Szwaczki, hafciarki i pokrewni",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Sewing, Embroidery and Related Workers"
   },
   "7534": {
     "title": "Tapicerzy i pokrewni",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Upholsterers and Related Workers"
   },
   "7535": {
     "title": "Wyprawiacze skór, garbarze i pokrewni",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Pelt Dressers, Tanners and Fellmongers"
   },
   "7536": {
     "title": "Obuwnicy i pokrewni",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Shoemakers and Related Workers"
   },
   "7541": {
     "title": "Nurkowie",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Underwater Divers"
   },
   "7542": {
     "title": "Strzałowi",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Shotfirers and Blasters"
   },
   "7543": {
     "title": "Brakarze wyrobów przemysłowych",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Product Graders and Testers (except Foods and Beverages)"
   },
   "7544": {
     "title": "Robotnicy zwalczania szkodników i chwastów",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Fumigators and Other Pest and Weed Controllers"
   },
   "7549": {
     "title": "Robotnicy przemysłowi i rzemieślnicy gdzie indziej niesklasyfikowani",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Craft and Related Workers not Elsewhere Classified"
   },
   "8111": {
     "title": "Górnicy podziemnej i odkrywkowej eksploatacji złóż i pokrewni",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Miners and Quarriers"
   },
   "8112": {
     "title": "Operatorzy maszyn i urządzeń do przeróbki mechanicznej kopalin",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Mineral and Stone Processing Plant Operators"
   },
   "8113": {
     "title": "Operatorzy urządzeń wiertniczych i wydobywczych ropy, gazu i innych surowców",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Well Drillers and Borers and Related Workers"
   },
   "8114": {
     "title": "Operatorzy maszyn i urządzeń do produkcji wyrobów cementowych, kamiennych i pokrewni",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Cement, Stone and Other Mineral Products Machine Operators"
   },
   "8121": {
     "title": "Operatorzy maszyn i urządzeń do produkcji i przetwórstwa metali",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Metal Processing Plant Operators"
   },
   "8122": {
     "title": "Operatorzy urządzeń do obróbki powierzchniowej metali i nakładania powłok",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Metal Finishing, Plating and Coating Machine Operators"
   },
   "8131": {
     "title": "Operatorzy maszyn i urządzeń do produkcji wyrobów chemicznych",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Chemical Products Plant and Machine Operators"
   },
   "8132": {
     "title": "Operatorzy urządzeń do produkcji materiałów światłoczułych i obróbki filmów",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Photographic Products Machine Operators"
   },
   "8141": {
     "title": "Operatorzy maszyn do produkcji wyrobów gumowych",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Rubber Products Machine Operators"
   },
   "8142": {
     "title": "Operatorzy maszyn do produkcji wyrobów z tworzyw sztucznych",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Plastic Products Machine Operators"
   },
   "8143": {
     "title": "Operatorzy maszyn do produkcji wyrobów papierniczych",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Paper Products Machine Operators"
   },
   "8151": {
     "title": "Operatorzy maszyn przędzalniczych i pokrewni",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Fibre Preparing, Spinning and Winding Machine Operators"
   },
   "8152": {
     "title": "Operatorzy maszyn tkackich i dziewiarskich",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Weaving and Knitting Machine Operators"
   },
   "8153": {
     "title": "Operatorzy maszyn do szycia",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Sewing Machine Operators"
   },
   "8154": {
     "title": "Operatorzy maszyn wykończalniczych wyrobów włókienniczych",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Bleaching, Dyeing and Fabric Cleaning Machine Operators"
   },
   "8155": {
     "title": "Operatorzy maszyn do wyprawiania futer i skór",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Fur and Leather Preparing Machine Operators"
   },
   "8156": {
     "title": "Operatorzy maszyn do produkcji obuwia i pokrewni",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Shoemaking and Related Machine Operators"
   },
   "8157": {
     "title": "Operatorzy maszyn do prania",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Laundry Machine Operators"
   },
   "8159": {
     "title": "Operatorzy maszyn do produkcji wyrobów włókienniczych, futrzarskich i skórzanych gdzie indziej niesklasyfikowani",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Textile, Fur and Leather Products Machine Operators Not Elsewhere Classified"
   },
   "8160": {
     "title": "Operatorzy maszyn do produkcji wyrobów spożywczych i pokrewni",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Food and Related Products Machine Operators"
   },
   "8171": {
     "title": "Operatorzy urządzeń do wyrobu masy papierniczej i produkcji papieru",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Pulp and Papermaking Plant Operators"
   },
   "8172": {
     "title": "Operatorzy maszyn i urządzeń do obróbki drewna",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Wood Processing Plant Operators"
   },
   "8181": {
     "title": "Operatorzy urządzeń do produkcji wyrobów szklanych i ceramicznych",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Glass and Ceramics Plant Operators"
   },
   "8182": {
     "title": "Maszyniści silników, kotłów parowych i pokrewni",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Steam Engine and Boiler Operators"
   },
   "8183": {
     "title": "Operatorzy urządzeń pakujących, do napełniania butelek i urządzeń znakujących",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Packing, Bottling and Labelling Machine Operators"
   },
   "8189": {
     "title": "Operatorzy innych maszyn i urządzeń przetwórczych gdzie indziej niesklasyfikowani",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Stationary Plant and Machine Operators Not Elsewhere Classified"
   },
   "8211": {
     "title": "Monterzy maszyn i urządzeń mechanicznych",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Mechanical Machinery Assemblers"
   },
   "8212": {
     "title": "Monterzy sprzętu elektrycznego",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Electrical and Electronic Equipment Assemblers"
   },
   "8219": {
     "title": "Monterzy gdzie indziej niesklasyfikowani",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Assemblers Not Elsewhere Classified"
   },
   "8311": {
     "title": "Maszyniści kolejowi i metra",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Locomotive Engine Drivers"
   },
   "8312": {
     "title": "Dyżurni ruchu, manewrowi i pokrewni",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Railway Brake, Signal and Switch Operators"
   },
   "8321": {
     "title": "Kierowcy motocykli",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Motorcycle Drivers"
   },
   "8322": {
     "title": "Kierowcy samochodów osobowych i dostawczych",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Car, Taxi and Van Drivers"
   },
   "8331": {
     "title": "Kierowcy autobusów i motorniczowie tramwajów",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Bus and Tram Drivers"
   },
   "8332": {
     "title": "Kierowcy samochodów ciężarowych",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Heavy Truck and Lorry Drivers"
   },
   "8341": {
     "title": "Operatorzy wolnobieżnych maszyn rolniczych i leśnych",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Mobile Farm and Forestry Plant Operators"
   },
   "8342": {
     "title": "Operatorzy sprzętu do robót ziemnych i urządzeń pokrewnych",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Earthmoving and Related Plant Operators"
   },
   "8343": {
     "title": "Maszyniści i operatorzy maszyn i urządzeń dźwigowo-transportowych i pokrewni",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Crane, hoist and related plant operators"
   },
   "8344": {
     "title": "Kierowcy operatorzy wózków jezdniowych",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Lifting Truck Operators"
   },
   "8350": {
     "title": "Marynarze i pokrewni",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Ships' Deck Crews and Related Workers"
   },
   "9111": {
     "title": "Pomoce domowe i sprzątaczki",
-    "skill_level": 9
+    "skill_level": 9,
+    "title_en": "Domestic Cleaners and Helpers"
   },
   "9112": {
     "title": "Pomoce i sprzątaczki biurowe, hotelowe i pokrewne",
-    "skill_level": 9
+    "skill_level": 9,
+    "title_en": "Cleaners and Helpers in Offices, Hotels and Other Establishments"
   },
   "9121": {
     "title": "Praczki ręczne i prasowacze",
-    "skill_level": 9
+    "skill_level": 9,
+    "title_en": "Hand Launderers and Pressers"
   },
   "9122": {
     "title": "Czyściciele pojazdów",
-    "skill_level": 9
+    "skill_level": 9,
+    "title_en": "Vehicle Cleaners"
   },
   "9123": {
     "title": "Zmywacze okien",
-    "skill_level": 9
+    "skill_level": 9,
+    "title_en": "Window Cleaners"
   },
   "9129": {
     "title": "Pozostali pracownicy zajmujący się sprzątaniem",
-    "skill_level": 9
+    "skill_level": 9,
+    "title_en": "Other Cleaning Workers"
   },
   "9211": {
     "title": "Robotnicy pomocniczy przy pracach polowych",
-    "skill_level": 9
+    "skill_level": 9,
+    "title_en": "Crop Farm Labourers"
   },
   "9212": {
     "title": "Robotnicy pomocniczy przy hodowli zwierząt",
-    "skill_level": 9
+    "skill_level": 9,
+    "title_en": "Livestock Farm Labourers"
   },
   "9213": {
     "title": "Robotnicy pomocniczy przy uprawie roślin i hodowli zwierząt",
-    "skill_level": 9
+    "skill_level": 9,
+    "title_en": "Mixed Crop and Livestock Farm Labourers"
   },
   "9214": {
     "title": "Robotnicy pomocniczy w ogrodnictwie i sadownictwie",
-    "skill_level": 9
+    "skill_level": 9,
+    "title_en": "Garden and Horticultural Labourers"
   },
   "9215": {
     "title": "Robotnicy pomocniczy w leśnictwie",
-    "skill_level": 9
+    "skill_level": 9,
+    "title_en": "Forestry Labourers"
   },
   "9216": {
     "title": "Robotnicy pomocniczy w rybołówstwie i uprawach wodnych",
-    "skill_level": 9
+    "skill_level": 9,
+    "title_en": "Fishery and Aquaculture Labourers"
   },
   "9311": {
     "title": "Robotnicy pomocniczy w kopalniach i kamieniołomach",
-    "skill_level": 9
+    "skill_level": 9,
+    "title_en": "Mining and Quarrying Labourers"
   },
   "9312": {
     "title": "Robotnicy pomocniczy w budownictwie drogowym, wodnym i pokrewni",
-    "skill_level": 9
+    "skill_level": 9,
+    "title_en": "Civil Engineering Labourers"
   },
   "9313": {
     "title": "Robotnicy pomocniczy w budownictwie ogólnym",
-    "skill_level": 9
+    "skill_level": 9,
+    "title_en": "Building Construction Labourers"
   },
   "9321": {
     "title": "Pakowacze",
-    "skill_level": 9
+    "skill_level": 9,
+    "title_en": "Hand Packers"
   },
   "9329": {
     "title": "Robotnicy przy pracach prostych w przemyśle gdzie indziej niesklasyfikowani",
-    "skill_level": 9
+    "skill_level": 9,
+    "title_en": "Manufacturing Labourers Not Elsewhere Classified"
   },
   "9331": {
     "title": "Prowadzący pojazdy napędzane siłą mięśni",
-    "skill_level": 9
+    "skill_level": 9,
+    "title_en": "Hand and Pedal Vehicle Drivers"
   },
   "9332": {
     "title": "Prowadzący pojazdy ciągnięte przez zwierzęta",
-    "skill_level": 9
+    "skill_level": 9,
+    "title_en": "Drivers of Animal-drawn Vehicles and Machinery"
   },
   "9333": {
     "title": "Robotnicy pracujący przy przeładunku towarów",
-    "skill_level": 9
+    "skill_level": 9,
+    "title_en": "Freight Handlers"
   },
   "9334": {
     "title": "Układacze towarów na półkach",
-    "skill_level": 9
+    "skill_level": 9,
+    "title_en": "Shelf Fillers"
   },
   "9411": {
     "title": "Pracownicy przygotowujący posiłki typu fast food",
-    "skill_level": 9
+    "skill_level": 9,
+    "title_en": "Fast Food Preparers"
   },
   "9412": {
     "title": "Pomoce kuchenne",
-    "skill_level": 9
+    "skill_level": 9,
+    "title_en": "Kitchen Helpers"
   },
   "9510": {
     "title": "Pracownicy świadczący usługi na ulicach",
-    "skill_level": 9
+    "skill_level": 9,
+    "title_en": "Street and Related Service Workers"
   },
   "9520": {
     "title": "Sprzedawcy uliczni produktów nieżywnościowych",
-    "skill_level": 9
+    "skill_level": 9,
+    "title_en": "Street Vendors (excluding Food)"
   },
   "9611": {
     "title": "Ładowacze nieczystości",
-    "skill_level": 9
+    "skill_level": 9,
+    "title_en": "Garbage and Recycling Collectors"
   },
   "9612": {
     "title": "Sortowacze odpadów",
-    "skill_level": 9
+    "skill_level": 9,
+    "title_en": "Refuse Sorters"
   },
   "9613": {
     "title": "Zamiatacze i pokrewni",
-    "skill_level": 9
+    "skill_level": 9,
+    "title_en": "Sweepers and Related Labourers"
   },
   "9621": {
     "title": "Gońcy, bagażowi i pokrewni",
-    "skill_level": 9
+    "skill_level": 9,
+    "title_en": "Messengers, Package Deliverers and Luggage Porters"
   },
   "9622": {
     "title": "Pracownicy wykonujący dorywcze prace proste",
-    "skill_level": 9
+    "skill_level": 9,
+    "title_en": "Odd Job Persons"
   },
   "9623": {
     "title": "Odczytujący liczniki i wybierający monety z automatów",
-    "skill_level": 9
+    "skill_level": 9,
+    "title_en": "Meter Readers and Vending-machine Collectors"
   },
   "9624": {
     "title": "Osoby zbierające wodę i drewno opałowe",
-    "skill_level": 9
+    "skill_level": 9,
+    "title_en": "Water and Firewood Collectors"
   },
   "9629": {
     "title": "Pracownicy przy pracach prostych gdzie indziej niesklasyfikowani",
-    "skill_level": 9
+    "skill_level": 9,
+    "title_en": "Elementary Workers Not Elsewhere Classified"
   }
 }

@@ -15,3 +15,7 @@ venv/
 # Local scratch/export folders.
 /tmp/
 /exports/
+
+# Read-only local source copies; do not deploy or edit.
+/ORIGINAL_FILES_Do_NOT_TOUCH/
+/ORIGINAL_FILES_DO_NOT_TOUCH/

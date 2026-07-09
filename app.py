@@ -183,6 +183,18 @@ div[data-testid="column"] > div {{
     color: #555;
     margin-top: 0.2rem;
 }}
+div[class*="st-key-pa_top10_ai_helpfulness_"][class*="_spread"] div[role="radiogroup"],
+div[class*="st-key-hitl_ai_helpfulness_"][class*="_spread"] div[role="radiogroup"] {{
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+}}
+div[class*="st-key-pa_top10_ai_helpfulness_"][class*="_spread"] div[role="radiogroup"] label,
+div[class*="st-key-hitl_ai_helpfulness_"][class*="_spread"] div[role="radiogroup"] label {{
+    flex: 1 1 0;
+    justify-content: center;
+}}
 @media (max-width: 700px) {{
     .logo-header {{
         gap: 1rem;
@@ -240,6 +252,18 @@ def render_logo_header():
 def _valid_login(username: str, password: str) -> bool:
     expected_password = APP_USERS.get(username)
     return expected_password is not None and hmac.compare_digest(password, expected_password)
+
+
+def render_helpfulness_scale(label: str, key: str) -> int:
+    """Render the standard Streamlit radio scale, spread across the row via CSS."""
+    with st.container(key=f"{key}_spread"):
+        return st.radio(
+            label,
+            options=[1, 2, 3, 4, 5],
+            index=2,
+            horizontal=True,
+            key=key,
+        )
 
 
 def render_login():
@@ -1280,11 +1304,8 @@ def render_pa_top10_step(df, idx: int, row, prefix: str, df_state_key: str, idx_
     # Ocena pomocności listy 10 dopasowanych kodów - wymagana zawsze, niezależnie
     # od tego, czy koder wybierze jeden z nich, czy przejdzie do kodowania
     # kaskadowego (patrz przycisk "Kontynuuj kodowanie kaskadowo" niżej).
-    ai_helpfulness = st.radio(
+    ai_helpfulness = render_helpfulness_scale(
         "Jak pomocne były dopasowane kody? (1-5 punktów)",
-        options=[1, 2, 3, 4, 5],
-        index=2,
-        horizontal=True,
         key=f"pa_top10_ai_helpfulness_{idx}",
     )
 
@@ -2346,11 +2367,8 @@ def render_classify_hitl():
     # Ocena pomocności listy 10 dopasowanych kodów - wymagana zawsze, niezależnie
     # od tego, czy koder wybierze jeden z nich, czy przejdzie do kodowania
     # kaskadowego (patrz przycisk "Zakoduj od zera" niżej).
-    ai_helpfulness = st.radio(
+    ai_helpfulness = render_helpfulness_scale(
         "Jak pomocne były dopasowane kody? (1-5 punktów)",
-        options=[1, 2, 3, 4, 5],
-        index=2,
-        horizontal=True,
         key=f"hitl_ai_helpfulness_{idx}",
     )
 

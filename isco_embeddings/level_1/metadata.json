@@ -1,42 +1,52 @@
 {
   "0": {
     "title": "SIŁY ZBROJNE",
-    "skill_level": 0
+    "skill_level": 0,
+    "title_en": "Armed Forces Occupations"
   },
   "1": {
     "title": "PRZEDSTAWICIELE WŁADZ PUBLICZNYCH, WYŻSI URZĘDNICY I KIEROWNICY",
-    "skill_level": 1
+    "skill_level": 1,
+    "title_en": "Managers"
   },
   "2": {
     "title": "SPECJALIŚCI",
-    "skill_level": 2
+    "skill_level": 2,
+    "title_en": "Professionals"
   },
   "3": {
     "title": "TECHNICY I INNY ŚREDNI PERSONEL",
-    "skill_level": 3
+    "skill_level": 3,
+    "title_en": "Technicians and Associate Professionals"
   },
   "4": {
     "title": "PRACOWNICY BIUROWI",
-    "skill_level": 4
+    "skill_level": 4,
+    "title_en": "Clerical Support Workers"
   },
   "5": {
     "title": "PRACOWNICY USŁUG I SPRZEDAWCY",
-    "skill_level": 5
+    "skill_level": 5,
+    "title_en": "Service and Sales Workers"
   },
   "6": {
     "title": "ROLNICY, OGRODNICY, LEŚNICY I RYBACY",
-    "skill_level": 6
+    "skill_level": 6,
+    "title_en": "Skilled Agricultural, Forestry and Fishery Workers"
   },
   "7": {
     "title": "ROBOTNICY PRZEMYSŁOWI I RZEMIEŚLNICY",
-    "skill_level": 7
+    "skill_level": 7,
+    "title_en": "Craft and Related Trades Workers"
   },
   "8": {
     "title": "OPERATORZY I MONTERZY MASZYN I URZĄDZEŃ",
-    "skill_level": 8
+    "skill_level": 8,
+    "title_en": "Plant and Machine Operators, and Assemblers"
   },
   "9": {
     "title": "PRACOWNICY PRZY PRACACH PROSTYCH",
-    "skill_level": 9
+    "skill_level": 9,
+    "title_en": "Elementary Occupations"
   }
 }
