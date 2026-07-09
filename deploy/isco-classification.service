@@ -1,0 +1,19 @@
+[Unit]
+Description=ISCO Classification Streamlit App
+After=network-online.target ollama.service
+Wants=network-online.target
+Requires=ollama.service
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/isco-classification
+Environment=OLLAMA_HOST=http://127.0.0.1:11434
+ExecStart=/home/ubuntu/isco-classification/venv/bin/streamlit run app.py --server.address=127.0.0.1 --server.port=8501 --server.headless=true
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
