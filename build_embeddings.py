@@ -21,37 +21,44 @@ WYMAGANIA PRZED URUCHOMIENIEM:
 
 Wymaga wcześniejszego uruchomienia export_isco_corpus.py (tworzy isco_corpus_L1..L4).
 
+Jeśli w folderze roboczym jest plik Opisy.xlsx (oryginalna struktura ISCO-08 EN,
+arkusz "ISCO-08 EN Struct and defin"), do metadata.json każdego poziomu zostanie
+dopisane pole "title_en" (angielski odpowiednik nazwy zawodu) - wykorzystywane
+w app.py do wyświetlania obok polskiej nazwy. Jeśli już masz zbudowane embeddingi
+i chcesz dołożyć tylko title_en bez ponownego (kosztownego) liczenia embeddingów,
+użyj zamiast tego skryptu add_english_titles.py.
+
 Odpalić RAZ (lub po każdej zmianie danych w isco_corpus_L*/):
 
     conda activate isco_rag
-    cd ~/Desktop/App_2Mod_RP2
+    cd ESS_ISCO_APP
     python build_embeddings.py
 """
 
 import json
-import os
 from pathlib import Path
 
 import numpy as np
 import ollama
+import pandas as pd
 
-# Ścieżka do folderu roboczego projektu - ustawiona na sztywno, żeby nie trzeba
-# było pamiętać o "cd" przed odpaleniem skryptu. Zmień, jeśli projekt leży gdzie indziej.
-WORKDIR = "/Users/mblaszczykowski/Desktop/App_2Mod_RP2"
-if os.path.isdir(WORKDIR):
-    os.chdir(WORKDIR)
-else:
-    print(f"UWAGA: nie znaleziono folderu {WORKDIR} - zostaję w bieżącym katalogu roboczym.")
+APP_DIR = Path(__file__).resolve().parent
 
 OLLAMA_MODEL = "qwen3-embedding:8b"
 BATCH_SIZE = 32  # ile tekstów wysyłamy do Ollama w jednym zapytaniu /api/embed
 
+# Oryginalny plik struktury ISCO-08 (angielskie nazwy zawodów) - opcjonalny:
+# jeśli jest obecny w folderze roboczym, do metadata.json każdego poziomu
+# dopisywane jest pole "title_en" (patrz load_english_titles / build_level).
+OPISY_XLSX = APP_DIR / "Opisy.xlsx"
+OPISY_SHEET = "ISCO-08 EN Struct and defin"
+
 # poziom -> (folder korpusu wejściowego, folder embeddingów wyjściowego)
 LEVEL_CONFIG = {
-    1: {"corpus_dir": "isco_corpus_L1", "out_dir": "isco_embeddings/level_1"},
-    2: {"corpus_dir": "isco_corpus_L2", "out_dir": "isco_embeddings/level_2"},
-    3: {"corpus_dir": "isco_corpus_L3", "out_dir": "isco_embeddings/level_3"},
-    4: {"corpus_dir": "isco_corpus_L4", "out_dir": "isco_embeddings/level_4"},
+    1: {"corpus_dir": APP_DIR / "isco_corpus_L1", "out_dir": APP_DIR / "isco_embeddings" / "level_1"},
+    2: {"corpus_dir": APP_DIR / "isco_corpus_L2", "out_dir": APP_DIR / "isco_embeddings" / "level_2"},
+    3: {"corpus_dir": APP_DIR / "isco_corpus_L3", "out_dir": APP_DIR / "isco_embeddings" / "level_3"},
+    4: {"corpus_dir": APP_DIR / "isco_corpus_L4", "out_dir": APP_DIR / "isco_embeddings" / "level_4"},
 }
 
 
@@ -108,7 +115,24 @@ def load_corpus(corpus_dir: str) -> dict:
     return corpus
 
 
-def build_level(level: int, corpus_dir: str, out_dir: str, model: OllamaEmbedder):
+def load_english_titles() -> dict:
+    """Zwraca słownik {kod_isco (string, wyzerowany do właściwej długości): Title EN}
+    dla wszystkich 4 poziomów naraz, na bazie oryginalnego pliku struktury ISCO-08
+    (Opisy.xlsx, kolumny Level / ISCO 08 Code / Title EN). Zwraca pusty słownik,
+    jeśli plik nie istnieje w folderze roboczym - wtedy metadata.json po prostu
+    nie dostanie pola title_en (patrz build_level)."""
+    if not Path(OPISY_XLSX).exists():
+        return {}
+    df = pd.read_excel(OPISY_XLSX, sheet_name=OPISY_SHEET)
+    titles_en = {}
+    for _, row in df.iterrows():
+        level = int(row["Level"])
+        code = str(int(row["ISCO 08 Code"])).zfill(level)
+        titles_en[code] = str(row["Title EN"]).strip() if pd.notna(row["Title EN"]) else ""
+    return titles_en
+
+
+def build_level(level: int, corpus_dir: str, out_dir: str, model: OllamaEmbedder, titles_en: dict):
     print(f"\n=== Poziom {level}: {corpus_dir} ===")
     if not Path(corpus_dir).exists():
         print(f"  POMINIĘTO - brak folderu {corpus_dir} (odpal najpierw export_isco_corpus.py)")
@@ -143,13 +167,22 @@ def build_level(level: int, corpus_dir: str, out_dir: str, model: OllamaEmbedder
         json.dump(codes_ordered, f, ensure_ascii=False, indent=2)
 
     metadata = {
-        code: {"title": corpus[code]["title"], "skill_level": corpus[code]["skill_level"]}
+        code: {
+            "title": corpus[code]["title"],
+            "title_en": titles_en.get(code, ""),
+            "skill_level": corpus[code]["skill_level"],
+        }
         for code in codes_ordered
     }
     with open(out_path / "metadata.json", "w", encoding="utf-8") as f:
         json.dump(metadata, f, ensure_ascii=False, indent=2)
 
+    matched_en = sum(1 for code in codes_ordered if titles_en.get(code))
     print(f"  Zapisano embeddingi i metadane w folderze: {out_path.resolve()}")
+    if titles_en:
+        print(f"  Angielskie nazwy (title_en): dopasowano {matched_en}/{len(codes_ordered)} kodów")
+    else:
+        print(f"  UWAGA: brak pliku {OPISY_XLSX} - metadata.json bez pola title_en (dopasuj potem add_english_titles.py)")
 
 
 def main():
@@ -158,9 +191,14 @@ def main():
     print(f"  ollama pull {OLLAMA_MODEL}\n")
 
     model = OllamaEmbedder()
+    titles_en = load_english_titles()
+    if titles_en:
+        print(f"Wczytano {len(titles_en)} angielskich nazw zawodów z {OPISY_XLSX}\n")
+    else:
+        print(f"UWAGA: nie znaleziono pliku {OPISY_XLSX} - metadata.json nie będzie mieć pola title_en.\n")
 
     for level, cfg in LEVEL_CONFIG.items():
-        build_level(level, cfg["corpus_dir"], cfg["out_dir"], model)
+        build_level(level, cfg["corpus_dir"], cfg["out_dir"], model, titles_en)
 
     print("\nGotowe - wszystkie poziomy zwektoryzowane.")
 

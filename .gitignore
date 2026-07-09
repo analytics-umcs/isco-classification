@@ -6,3 +6,12 @@ __pycache__/
 .venv/
 venv/
 *.log
+
+# Local duplicate source copies; deployment uses assets/.
+/ess_eric_logo.jpg
+/ifis.jpeg
+/logoc.png
+
+# Local scratch/export folders.
+/tmp/
+/exports/

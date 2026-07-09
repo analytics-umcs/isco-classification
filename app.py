@@ -1,23 +1,19 @@
-from __future__ import annotations
-
+import base64
+import hmac
 import io
 import json
-import hmac
-import os
 import time
 from pathlib import Path
+from typing import Optional, Tuple
 
 import numpy as np
 import pandas as pd
 import streamlit as st
 import ollama
 
-# Ścieżka do folderu roboczego projektu - ustawiona na sztywno, żeby ścieżki
-# względne (isco_embeddings/...) działały niezależnie od tego, skąd odpalasz
-# "streamlit run app.py". Zmień, jeśli projekt leży gdzie indziej.
-WORKDIR = "/Users/mblaszczykowski/Desktop/App_2Mod_RP2"
-if os.path.isdir(WORKDIR):
-    os.chdir(WORKDIR)
+# Resolve bundled assets and embeddings from the app directory regardless of
+# where Streamlit is launched from.
+APP_DIR = Path(__file__).resolve().parent
 
 # ============================================================
 # KONFIGURACJA STRONY
@@ -25,25 +21,13 @@ if os.path.isdir(WORKDIR):
 st.set_page_config(
     page_title="Klasyfikacja zawodów ISCO-08",
     page_icon="🧭",
-    layout="centered",
+    layout="wide",  # zmienione z "centered" - więcej miejsca poziomego, żeby długie nazwy
+    # zawodów w liście kandydatów rzadziej wymagały skracania (patrz MAX_LABEL_LINE_LEN)
 )
 
-EMB_DIR = "isco_embeddings/level_4"  # pełna baza 436 kodów (poziom 4) - używana w modułach 1 i 2
+EMB_DIR = APP_DIR / "isco_embeddings" / "level_4"  # pełna baza 436 kodów (poziom 4) - używana w modułach 1 i 2
 MODEL_NAME = "qwen3-embedding:8b"  # lokalnie przez Ollama, brak API
 OLLAMA_BATCH_SIZE = 32
-
-APP_USERS = {
-    "User1": "JuPpayQ9",
-    "User2": "Qaw8bBIP",
-    "User3": "4WjJICEV",
-    "User4": "GdpenECK",
-    "User5": "rS4xCzrE",
-    "User6": "fueIZ8Ab",
-    "User7": "BiRPwP3x",
-    "User8": "jrkj4Xoh",
-    "User9": "qlFhOlqR",
-    "User10": "FefEeumO",
-}
 
 # Qwen3-Embedding wymaga prefiksu instrukcji TYLKO po stronie zapytania (query),
 # NIE po stronie dokumentów (korpus ISCO embedowany jest bez prefiksu w
@@ -58,10 +42,10 @@ WEIGHTS = {"title": 0.30, "tasks": 0.50, "synteza": 0.20}
 
 # Foldery embeddingów dla trybu kaskadowego (kodowanie cyfra po cyfrze)
 LEVEL_EMB_DIRS = {
-    1: "isco_embeddings/level_1",   # 10 kodów - grupy główne
-    2: "isco_embeddings/level_2",   # 43 kody - grupy drugorzędne
-    3: "isco_embeddings/level_3",   # 130 kodów - grupy średnie
-    4: "isco_embeddings/level_4",   # 436 kodów - grupy elementarne
+    1: APP_DIR / "isco_embeddings" / "level_1",   # 10 kodów - grupy główne
+    2: APP_DIR / "isco_embeddings" / "level_2",   # 43 kody - grupy drugorzędne
+    3: APP_DIR / "isco_embeddings" / "level_3",   # 130 kodów - grupy średnie
+    4: APP_DIR / "isco_embeddings" / "level_4",   # 436 kodów - grupy elementarne
 }
 
 # Kolumny źródłowe używane do klasyfikacji - osobny zestaw dla respondenta
@@ -70,6 +54,26 @@ LEVEL_EMB_DIRS = {
 TARGET_COLUMNS = {
     "Respondent": {"zawod": "B33", "obowiazki": "B34", "wyksztalcenie": "B35"},
     "Partner": {"zawod": "B48", "obowiazki": "B49", "wyksztalcenie": "B50"},
+}
+
+APP_USERS = {
+    "User1": "JuPpayQ9",
+    "User2": "Qaw8bBIP",
+    "User3": "4WjJICEV",
+    "User4": "GdpenECK",
+    "User5": "rS4xCzrE",
+    "User6": "fueIZ8Ab",
+    "User7": "BiRPwP3x",
+    "User8": "jrkj4Xoh",
+    "User9": "qlFhOlqR",
+    "User10": "FefEeumO",
+}
+
+ASSET_DIR = APP_DIR / "assets"
+LOGO_PATHS = {
+    "UMCS": ASSET_DIR / "logoc.png",
+    "IFiS PAN": ASSET_DIR / "ifis.jpeg",
+    "ESS": ASSET_DIR / "ess_eric_logo.jpg",
 }
 
 
@@ -85,6 +89,42 @@ CUSTOM_CSS = f"""
     background: linear-gradient(to right, {COLOR_ISCO} 0%, {COLOR_ISCO} 50%, {COLOR_ESS} 50%, {COLOR_ESS} 100%);
     margin-bottom: 1.5rem;
     border-radius: 3px;
+}}
+.logo-header {{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3.2rem;
+    flex-wrap: nowrap;
+    padding: 0.2rem 0 0.9rem 0;
+    margin-bottom: 0.8rem;
+}}
+.logo-header__item {{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-width: 0;
+}}
+.logo-header__item img {{
+    display: block;
+    max-width: 440px;
+    max-height: 136px;
+    object-fit: contain;
+}}
+.logo-header__item--umcs img {{
+    max-width: 462px;
+    max-height: 143px;
+}}
+.logo-header__item--ifis img {{
+    max-height: 164px;
+}}
+.logo-header__item--ess img {{
+    max-width: 1085px;
+    max-height: 336px;
+}}
+.login-panel {{
+    max-width: 420px;
+    margin: 1.2rem auto 0 auto;
 }}
 .app-header {{
     text-align: center;
@@ -143,8 +183,100 @@ div[data-testid="column"] > div {{
     color: #555;
     margin-top: 0.2rem;
 }}
+@media (max-width: 700px) {{
+    .logo-header {{
+        gap: 1rem;
+        justify-content: flex-start;
+        overflow-x: auto;
+        padding: 0.2rem 0 0.9rem 0;
+    }}
+    .logo-header__item img,
+    .logo-header__item--ifis img {{
+        max-height: 116px;
+    }}
+    .logo-header__item--umcs img {{
+        max-height: 122px;
+    }}
+    .logo-header__item--ess img {{
+        max-height: 286px;
+    }}
+}}
 </style>
 """
+
+
+def _asset_data_uri(path: Path) -> str:
+    suffix = path.suffix.lower().lstrip(".")
+    mime = "svg+xml" if suffix == "svg" else suffix
+    with open(path, "rb") as f:
+        encoded = base64.b64encode(f.read()).decode("ascii")
+    return f"data:image/{mime};base64,{encoded}"
+
+
+def render_logo_header():
+    missing = [name for name, path in LOGO_PATHS.items() if not path.exists()]
+    if missing:
+        st.warning("Brak plików logo: " + ", ".join(missing))
+        return
+
+    st.markdown(
+        f"""
+        <div class="logo-header">
+            <div class="logo-header__item logo-header__item--umcs">
+                <img src="{_asset_data_uri(LOGO_PATHS["UMCS"])}" alt="UMCS">
+            </div>
+            <div class="logo-header__item logo-header__item--ifis">
+                <img src="{_asset_data_uri(LOGO_PATHS["IFiS PAN"])}" alt="IFiS PAN">
+            </div>
+            <div class="logo-header__item logo-header__item--ess">
+                <img src="{_asset_data_uri(LOGO_PATHS["ESS"])}" alt="ESS">
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _valid_login(username: str, password: str) -> bool:
+    expected_password = APP_USERS.get(username)
+    return expected_password is not None and hmac.compare_digest(password, expected_password)
+
+
+def render_login():
+    st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+    st.markdown('<div class="top-bar"></div>', unsafe_allow_html=True)
+    render_logo_header()
+    st.markdown(
+        """
+        <div class="app-header">
+            <h1>System wspomagania klasyfikacji zawodów ISCO-08</h1>
+            <p>Logowanie do aplikacji</p>
+            <hr>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown('<div class="login-panel">', unsafe_allow_html=True)
+    with st.form("login_form"):
+        username = st.text_input("Użytkownik")
+        password = st.text_input("Hasło", type="password")
+        submitted = st.form_submit_button("Zaloguj", use_container_width=True)
+
+    if submitted:
+        if _valid_login(username.strip(), password):
+            st.session_state.authenticated = True
+            st.session_state.username = username.strip()
+            st.rerun()
+        else:
+            st.error("Nieprawidłowy użytkownik lub hasło.")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+def require_login():
+    if not st.session_state.get("authenticated", False):
+        render_login()
+        st.stop()
 
 
 # ============================================================
@@ -227,8 +359,8 @@ def load_embeddings_level(level: int):
 
 
 VAR_METADATA_PATHS = {
-    "Respondent": "ess_var_metadata_pl_respondent.json",
-    "Partner": "ess_var_metadata_pl_partner.json",
+    "Respondent": APP_DIR / "ess_var_metadata_pl_respondent.json",
+    "Partner": APP_DIR / "ess_var_metadata_pl_partner.json",
 }
 
 
@@ -243,7 +375,7 @@ def load_var_metadata(target: str = "Respondent") -> dict:
 
     UWAGA: celowo BEZ @st.cache_resource - to mały plik JSON, tani w odczycie,
     a cache_resource trzymałby wynik (w tym pusty słownik, gdy plik jeszcze
-    nie istniał) na stałe między rerunami, mimo późniejszej zmiany WORKDIR
+    nie istniał) na stałe między rerunami, mimo późniejszej zmiany plików
     albo dodania pliku na dysk."""
     path = Path(VAR_METADATA_PATHS.get(target, VAR_METADATA_PATHS["Respondent"]))
     if not path.exists():
@@ -296,7 +428,7 @@ def visible_df_for_mode(df: pd.DataFrame, target: str) -> pd.DataFrame:
     return df[keep_cols]
 
 
-def _build_column_help(col: str, var_meta: dict) -> str | None:
+def _build_column_help(col: str, var_meta: dict) -> Optional[str]:
     """Buduje tekst dymka (tooltip) dla nagłówka kolumny na podstawie metadanych
     zmiennej: etykieta zmiennej + (jeśli jest ich rozsądnie mało) lista etykiet
     wartości. Zwraca None, jeśli brak metadanych dla tej kolumny."""
@@ -328,6 +460,42 @@ def build_column_config(df: pd.DataFrame, var_meta: dict) -> dict:
         if help_text:
             config[col] = st.column_config.Column(help=help_text)
     return config
+
+
+MAX_LABEL_LINE_LEN = 160  # limit znaków w głównej linii etykiety (kod + nazwa PL +
+# " - dopasowanie: x.xxx") - podniesiony razem ze zmianą layoutu strony na "wide" (więcej
+# miejsca poziomego), więc skracanie wielokropkiem powinno teraz być rzadkością, nie regułą
+
+
+def _format_candidate_label(isco_code: str, title_pl: str, title_en: str = "", score: Optional[float] = None) -> str:
+    """Buduje etykietę kandydata do widgetu wyboru (st.radio):
+    '<kod> — <nazwa PL> - dopasowanie: <wartość>' + (jeśli dostępny)
+    angielski odpowiednik w osobnym akapicie pod spodem, kursywą - jako
+    najbliższe dostępne przybliżenie "mniejszej czcionki" w zwykłym tekście
+    opcji (st.radio nie obsługuje HTML/CSS ani realnego rozmiaru fontu w
+    opcjach, tylko podstawowy markdown, jeśli w ogóle). To PRÓBA wymuszenia
+    złamania linii wewnątrz jednej opcji - poprzedni test z pojedynczym \\n
+    sklejał się w jedną linię, dlatego tu używamy podwójnego \\n\\n (znak
+    akapitu w markdown) - jeśli to również się nie uda, jedynym pewnym
+    rozwiązaniem pozostaje pokazanie angielskiego odpowiednika w osobnym,
+    zwykłym bloku tekstu nad listą (poza opcjami radio).
+
+    Główna linia (kod — nazwa PL - dopasowanie) jest ograniczona do
+    MAX_LABEL_LINE_LEN znaków - jeśli polska nazwa zawodu jest zbyt długa,
+    zostaje przycięta i zakończona wielokropkiem "…", żeby ta linia NIGDY
+    nie zawijała się na dwie, niezależnie od długości nazwy czy szerokości
+    ekranu. Angielski odpowiednik w drugim akapicie NIE jest przycinany -
+    to osobna linia, więc jej ewentualne zawinięcie nie psuje głównej."""
+    title_display = _lower_first(title_pl)
+    suffix = f" - dopasowanie: {score:.3f}" if score is not None else ""
+    prefix = f"{isco_code} — "
+    budget = MAX_LABEL_LINE_LEN - len(prefix) - len(suffix)
+    if budget > 10 and len(title_display) > budget:
+        title_display = title_display[: budget - 1].rstrip(" ,;.-") + "…"
+    label = prefix + title_display + suffix
+    if title_en:
+        label += f"\n\n*(ang. {title_en})*"
+    return label
 
 
 def _lower_first(s: str) -> str:
@@ -368,12 +536,176 @@ def _target_cols(df_state_key: str) -> dict:
     return TARGET_COLUMNS[_get_coding_target(df_state_key)]
 
 
-def _reset_module_progress(df_state_key: str, idx_state_key: str):
+def _ensure_text_column_dtype(df: pd.DataFrame, col: str) -> None:
+    """Wymusza dtype 'object' na kolumnie, która ma przechowywać tekst/kody
+    ISCO-08 (a nie liczby) - w miejscu, bez tworzenia nowego df.
+
+    Zapobiega błędowi pandas "Invalid value '...' for dtype 'float64'", który
+    pojawia się przy WZNOWIENIU kodowania z wcześniej częściowo wypełnionego
+    pliku CSV: skoro istniejące kody ISCO-08 w takiej kolumnie wyglądają jak
+    liczby (np. "1420" zapisane bez cudzysłowu w CSV), pandas przy wczytaniu
+    automatycznie nadaje całej kolumnie typ float64 - a wtedy próba zapisania
+    KOLEJNEJ wartości jako zwykły string (np. nowo wybranego kodu) wywala
+    wyjątek zamiast po cichu przekonwertować typ.
+
+    Istniejące wartości liczbowe w stylu 1420.0 są przy okazji sprowadzane
+    z powrotem do czystego stringa "1420" (bez zbędnego ".0"), żeby stare i
+    nowo dopisywane wiersze miały spójny format w eksportowanym pliku."""
+    if col not in df.columns or df[col].dtype == "object":
+        return
+
+    def _to_text(v):
+        if pd.isna(v):
+            return None
+        if isinstance(v, float) and v.is_integer():
+            return str(int(v))
+        return str(v)
+
+    df[col] = df[col].map(_to_text).astype("object")
+
+
+def _ensure_object_dtype(df: pd.DataFrame, col: str) -> None:
+    """Wymusza dtype 'object' na kolumnie BEZ zmiany samych wartości - patrz
+    _ensure_text_column_dtype. Używane dla kolumn, które nie są kodami/tekstem
+    (np. bool "Czy_uzytkownik_wracal"), więc nie chcemy stringować wartości,
+    tylko dopuścić dowolny typ przy kolejnych zapisach."""
+    if col in df.columns and df[col].dtype != "object":
+        df[col] = df[col].astype("object")
+
+
+QUALIFYING_FLAG_COLUMNS = {
+    "Respondent": "Respondent_analiza",
+    "Partner": "Partner_analiza",
+}
+
+
+def _qualifying_mask(df: pd.DataFrame, target: str) -> pd.Series:
+    """Zwraca maskę bool (per wiersz) wskazującą, czy dany wiersz W OGÓLE
+    powinien trafić do kodowania w trybie `target` ('Respondent' albo
+    'Partner'). Sprawdzana jest flaga w kolumnie
+    QUALIFYING_FLAG_COLUMNS[target] ('Respondent_analiza' dla Respondentów,
+    'Partner_analiza' dla Partnerów) - wiersz kwalifikuje się, gdy ta
+    flaga == 1 (obsługiwane formaty: liczba 1, 1.0, string "1"). Wartości
+    puste, 0 albo cokolwiek innego oznaczają pominięcie wiersza. Jeśli w
+    pliku nie ma takiej kolumny wcale, WSZYSTKIE wiersze się kwalifikują
+    (kompatybilność wsteczna ze starszymi plikami bez tych flag)."""
+    col = QUALIFYING_FLAG_COLUMNS.get(target)
+    if not col or col not in df.columns:
+        return pd.Series(True, index=df.index)
+
+    def _is_one(v):
+        if pd.isna(v):
+            return False
+        try:
+            return float(v) == 1.0
+        except (TypeError, ValueError):
+            return str(v).strip() == "1"
+
+    return df[col].apply(_is_one)
+
+
+def _qualifying_positions(df: pd.DataFrame, target: str) -> list[int]:
+    """Zwraca posortowaną listę pozycji (0-indexed, zgodnych z df.iloc/df.at)
+    wierszy kwalifikujących się do kodowania w trybie `target` - patrz
+    _qualifying_mask. Wiersze niekwalifikujące się są całkowicie pomijane w
+    nawigacji (nigdy nie są pokazywane koderowi)."""
+    mask = _qualifying_mask(df, target).to_numpy()
+    return [i for i, ok in enumerate(mask) if ok]
+
+
+def _next_qualifying_idx(qualifying_positions: list[int], current_idx: int, n: int) -> int:
+    """Zwraca najbliższą kwalifikującą się pozycję ŚCIŚLE większą niż
+    current_idx, albo n (koniec/zakończono), jeśli żadna dalsza się nie
+    kwalifikuje. Używane zamiast zwykłego "idx + 1" przy przechodzeniu do
+    kolejnej osoby, żeby pomijać wiersze niespełniające flagi
+    Respondent_analiza / Partner_analiza."""
+    for pos in qualifying_positions:
+        if pos > current_idx:
+            return pos
+    return n
+
+
+def _prev_qualifying_idx(qualifying_positions: list[int], current_idx: int) -> int:
+    """Zwraca najbliższą kwalifikującą się pozycję ŚCIŚLE mniejszą niż
+    current_idx. Jeśli żadna wcześniejsza się nie kwalifikuje, zwraca
+    current_idx bez zmian (nie ma dokąd się cofnąć - przycisk "Poprzedni"
+    powinien się wtedy po prostu nie pokazywać, patrz miejsca wywołania)."""
+    prev = None
+    for pos in qualifying_positions:
+        if pos >= current_idx:
+            break
+        prev = pos
+    return prev if prev is not None else current_idx
+
+
+def _qualifying_progress(qualifying_positions: list[int], idx: int, n: int) -> tuple[float, int, int]:
+    """Zwraca (ułamek_postępu, aktualna_pozycja_1_indexed, łączna_liczba) do
+    wyświetlenia na pasku postępu, licząc WYŁĄCZNIE kwalifikujące się wiersze
+    (patrz _qualifying_positions) - a nie surową liczbę wszystkich wierszy w
+    pliku, skoro część z nich jest pomijana (Respondent_analiza /
+    Partner_analiza != 1)."""
+    total = len(qualifying_positions)
+    if total == 0:
+        return 0.0, 0, 0
+    if idx >= n:
+        completed = total
+    else:
+        completed = qualifying_positions.index(idx) if idx in qualifying_positions else 0
+    fraction = completed / total
+    current_rank = min(completed + 1, total)
+    return fraction, current_rank, total
+
+
+def _first_unfinished_idx(df: pd.DataFrame, target: str) -> int:
+    """Zwraca indeks pierwszego KWALIFIKUJĄCEGO SIĘ wiersza (patrz
+    _qualifying_mask - flaga Respondent_analiza / Partner_analiza == 1),
+    dla którego NIE zapisano jeszcze decyzji kodera w trybie `target`
+    ('Respondent' albo 'Partner') - czyli miejsca, od którego trzeba
+    (kontynuować) kodowanie. Wiersz uznajemy za już zakodowany, gdy jego
+    'Kodowany_podmiot' zgadza się z `target` ORAZ wypełniony jest
+    'ISCO_wybrany' albo 'Brak_mozliwosci_zakodowania' == "Tak". Wiersze
+    NIEkwalifikujące się są traktowane jak już gotowe (pomijane) - nigdy nie
+    są pokazywane koderowi. Jeśli wszystkie kwalifikujące się wiersze mają
+    już decyzję (albo nie ma żadnych kwalifikujących się w ogóle), zwraca
+    len(df) (koniec pliku - kodowanie w tym trybie jest kompletne).
+
+    Dzięki temu, jeśli koder przerwie sesję w połowie (np. po 10 osobach) i
+    wróci później do TEGO SAMEGO, częściowo wypełnionego pliku - czy to w tej
+    samej, czy w zupełnie nowej sesji przeglądarki (po ponownym wgraniu
+    wcześniej pobranego CSV) - aplikacja sama wznowi kodowanie od pierwszej
+    nieoznaczonej osoby, zamiast zaczynać od zera. Dla zupełnie świeżego pliku
+    (bez żadnych decyzji zapisanych) zwraca indeks pierwszego kwalifikującego
+    się wiersza (0, jeśli ten się kwalifikuje)."""
+    qualifies = _qualifying_mask(df, target)
+    if "Kodowany_podmiot" not in df.columns:
+        positions = qualifies.to_numpy().nonzero()[0]
+        return int(positions[0]) if len(positions) else len(df)
+    decided = df["Kodowany_podmiot"] == target
+    if "ISCO_wybrany" in df.columns:
+        decided = decided & df["ISCO_wybrany"].notna()
+    else:
+        decided = decided & False
+    if "Brak_mozliwosci_zakodowania" in df.columns:
+        decided = decided | ((df["Kodowany_podmiot"] == target) & (df["Brak_mozliwosci_zakodowania"] == "Tak"))
+    # Wiersze niekwalifikujące się traktujemy jako "gotowe" (pomijane) - nie
+    # mają być pokazywane koderowi w ogóle.
+    decided = decided | (~qualifies)
+    undecided_positions = (~decided).to_numpy().nonzero()[0]
+    return int(undecided_positions[0]) if len(undecided_positions) else len(df)
+
+
+def _reset_module_progress(df_state_key: str, idx_state_key: str, df=None, target_mode: Optional[str] = None):
     """Czyści cały postęp kodowania w danym module (wybory, cache klasyfikacji,
-    liczniki czasu, stan kaskady, zaznaczenia w tabeli) i cofa do respondenta
-    nr 1. Używane przy twardym przełączeniu trybu Respondent/Partner w trakcie
-    sesji. Same dane (df) i wynik zapisany w kolumnach wynikowych NIE są
-    czyszczone - o ich pobranie (częściowy CSV) prosimy PRZED przełączeniem."""
+    liczniki czasu, stan kaskady, zaznaczenia w tabeli). Używane przy twardym
+    przełączeniu trybu Respondent/Partner w trakcie sesji. Same dane (df) i
+    wynik zapisany w kolumnach wynikowych NIE są czyszczone - o ich pobranie
+    (częściowy CSV) prosimy PRZED przełączeniem.
+
+    Jeśli podano `df` i `target_mode`, indeks NIE wraca do zera na sztywno -
+    zamiast tego, tak jak przy wznowieniu z pliku, ustawiany jest na pierwszą
+    nieukończoną osobę w trybie `target_mode` (patrz _first_unfinished_idx) -
+    dzięki temu powrót do drugiego trybu (np. z Respondentów na Partnerów)
+    też trafia tam, gdzie koder poprzednio skończył, a nie zawsze na start."""
     clear_prefixes = ("hitl_", "hitl1d_", "cascade_", "pa1_", "pa_top10_", "resp_table_")
     keep_keys = {
         df_state_key,
@@ -387,7 +719,10 @@ def _reset_module_progress(df_state_key: str, idx_state_key: str):
             continue
         if key.startswith(clear_prefixes):
             del st.session_state[key]
-    st.session_state[idx_state_key] = 0
+    if df is not None and target_mode:
+        st.session_state[idx_state_key] = _first_unfinished_idx(df, target_mode)
+    else:
+        st.session_state[idx_state_key] = 0
 
 
 def render_mode_selector(df_state_key: str, idx_state_key: str, df, idx: int, n: int) -> str:
@@ -397,7 +732,13 @@ def render_mode_selector(df_state_key: str, idx_state_key: str, df, idx: int, n:
     ukończono jeszcze wszystkich respondentów), kliknięcie drugiego trybu NIE
     przełącza od razu - pokazuje ostrzeżenie z możliwością pobrania
     częściowego wyniku i zakończenia bieżącej sesji. Zakończenie NIE przełącza
-    automatycznie na drugi tryb - to osobna, świadoma decyzja kodera."""
+    automatycznie na drugi tryb - to osobna, świadoma decyzja kodera.
+
+    W obu przypadkach (przełączenie bezpośrednie, gdy drugi tryb nie jest w
+    trakcie, oraz przełączenie po "Zakończ kodowanie") indeks NIE wraca na
+    sztywno do zera - ustawiany jest na pierwszą nieukończoną osobę w nowym
+    trybie (patrz _first_unfinished_idx), więc powrót do drugiego trybu też
+    trafia tam, gdzie koder poprzednio skończył."""
     mode_key = _mode_key(df_state_key)
     if mode_key not in st.session_state:
         st.session_state[mode_key] = "Respondent"
@@ -405,13 +746,17 @@ def render_mode_selector(df_state_key: str, idx_state_key: str, df, idx: int, n:
 
     in_progress = 0 < idx < n
     pending_key = f"pending_mode_{df_state_key}"
+    pending_target_key = f"pending_target_{df_state_key}"
 
     if st.session_state.get(pending_key):
         current_plural = "respondentów" if current == "Respondent" else "partnerów"
+        qualifying_positions_switch = _qualifying_positions(df, current)
+        _, progress_rank_switch, progress_total_switch = _qualifying_progress(qualifying_positions_switch, idx, n)
 
         st.warning(
-            f"Kodowanie {current_plural} nie zostało jeszcze ukończone ({idx} z {n}). "
-            "Żeby przełączyć się na drugi tryb, najpierw zakończ i zapisz obecną sesję - "
+            f"Kodowanie {current_plural} nie zostało jeszcze ukończone "
+            f"({progress_rank_switch - 1} z {progress_total_switch}). "
+            "Najpierw pobierz do CSV obecne wyniki, a potem zakończ kodowanie - "
             "inaczej niezapisany postęp zostanie utracony."
         )
 
@@ -435,8 +780,11 @@ def render_mode_selector(df_state_key: str, idx_state_key: str, df, idx: int, n:
                 use_container_width=True,
                 key=f"end_session_{df_state_key}",
             ):
+                target_mode = st.session_state.pop(pending_target_key, None)
                 st.session_state.pop(pending_key, None)
-                _reset_module_progress(df_state_key, idx_state_key)
+                _reset_module_progress(df_state_key, idx_state_key, df=df, target_mode=target_mode)
+                if target_mode:
+                    st.session_state[mode_key] = target_mode
                 st.rerun()
         with col_cancel:
             if st.button(
@@ -445,6 +793,7 @@ def render_mode_selector(df_state_key: str, idx_state_key: str, df, idx: int, n:
                 key=f"cancel_switch_{df_state_key}",
             ):
                 st.session_state.pop(pending_key, None)
+                st.session_state.pop(pending_target_key, None)
                 st.rerun()
 
         return current
@@ -460,8 +809,10 @@ def render_mode_selector(df_state_key: str, idx_state_key: str, df, idx: int, n:
             if current != "Respondent":
                 if in_progress:
                     st.session_state[pending_key] = True
+                    st.session_state[pending_target_key] = "Respondent"
                 else:
                     st.session_state[mode_key] = "Respondent"
+                    st.session_state[idx_state_key] = _first_unfinished_idx(df, "Respondent")
                 st.rerun()
     with col_p:
         if st.button(
@@ -473,8 +824,10 @@ def render_mode_selector(df_state_key: str, idx_state_key: str, df, idx: int, n:
             if current != "Partner":
                 if in_progress:
                     st.session_state[pending_key] = True
+                    st.session_state[pending_target_key] = "Partner"
                 else:
                     st.session_state[mode_key] = "Partner"
+                    st.session_state[idx_state_key] = _first_unfinished_idx(df, "Partner")
                 st.rerun()
 
     return st.session_state[mode_key]
@@ -483,7 +836,7 @@ def render_mode_selector(df_state_key: str, idx_state_key: str, df, idx: int, n:
 
 
 
-def _decode_value(raw_val, value_labels: dict) -> str | None:
+def _decode_value(raw_val, value_labels: dict) -> Optional[str]:
     if pd.isna(raw_val) or not value_labels:
         return None
     key_candidates = [str(raw_val)]
@@ -538,7 +891,7 @@ def classify(
     codes_ordered: list,
     metadata: dict,
     top_k: int = 5,
-    prefix: str | None = None,
+    prefix: Optional[str] = None,
 ) -> pd.DataFrame:
     q_zawod = model.encode([QUERY_INSTRUCTION + zawod_czlowieka], normalize_embeddings=True)
     q_skills = model.encode([QUERY_INSTRUCTION + umiejetnosci_obowiazki], normalize_embeddings=True)
@@ -568,6 +921,7 @@ def classify(
             {
                 "isco_code": code,
                 "title_pl": metadata[code]["title"],
+                "title_en": metadata[code].get("title_en", ""),
                 "sim_title": round(float(sim_title[i]), 4),
                 "sim_tasks": round(float(sim_tasks[i]), 4),
                 "sim_synteza": round(float(sim_synteza[i]), 4),
@@ -588,7 +942,7 @@ def classify_level(
     synteza_emb: np.ndarray,
     codes_ordered: list,
     metadata: dict,
-    prefix: str | None = None,
+    prefix: Optional[str] = None,
 ) -> pd.DataFrame:
     """Wersja klasyfikacji na potrzeby trybu kaskadowego (kodowanie cyfra po cyfrze).
 
@@ -618,6 +972,7 @@ def classify_level(
             {
                 "isco_code": code,
                 "title_pl": metadata[code]["title"],
+                "title_en": metadata[code].get("title_en", ""),
                 "sim_title": round(float(sim_title[i]), 4),
                 "sim_tasks": round(float(sim_tasks[i]), 4),
                 "sim_synteza": round(float(sim_synteza[i]), 4),
@@ -672,6 +1027,7 @@ def batch_classify_dataframe(
             {
                 "isco_code": codes_ordered[i],
                 "title_pl": metadata[codes_ordered[i]]["title"],
+                "title_en": metadata[codes_ordered[i]].get("title_en", ""),
                 "score": round(float(row_scores[i]), 4),
             }
             for i in top_idx
@@ -699,65 +1055,9 @@ def read_csv_robust(uploaded_file) -> pd.DataFrame:
 if "page" not in st.session_state:
     st.session_state.page = "home"
 
-if "authenticated" not in st.session_state:
-    st.session_state.authenticated = False
-
-if "authenticated_user" not in st.session_state:
-    st.session_state.authenticated_user = None
-
 
 def go_to(page_name: str):
     st.session_state.page = page_name
-
-
-def _valid_login(username: str, password: str) -> bool:
-    expected_password = APP_USERS.get(username)
-    if expected_password is None:
-        return False
-    return hmac.compare_digest(password, expected_password)
-
-
-def render_login():
-    st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
-    st.markdown('<div class="top-bar"></div>', unsafe_allow_html=True)
-    st.markdown(
-        """
-        <div class="app-header">
-            <h1>System wspomagania klasyfikacji zawodów ISCO-08</h1>
-            <p>Logowanie</p>
-            <hr>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    with st.form("login_form"):
-        username = st.text_input("Użytkownik")
-        password = st.text_input("Hasło", type="password")
-        submitted = st.form_submit_button("Zaloguj", use_container_width=True)
-
-    if submitted:
-        username = username.strip()
-        if _valid_login(username, password):
-            st.session_state.authenticated = True
-            st.session_state.authenticated_user = username
-            st.session_state.page = "home"
-            st.rerun()
-        else:
-            st.error("Nieprawidłowy użytkownik lub hasło.")
-
-
-def require_login():
-    if not st.session_state.authenticated:
-        render_login()
-        st.stop()
-
-    st.sidebar.caption(f"Zalogowano jako: {st.session_state.authenticated_user}")
-    if st.sidebar.button("Wyloguj", use_container_width=True):
-        st.session_state.authenticated = False
-        st.session_state.authenticated_user = None
-        st.session_state.page = "home"
-        st.rerun()
 
 
 # ============================================================
@@ -766,6 +1066,7 @@ def require_login():
 def render_home():
     st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
     st.markdown('<div class="top-bar"></div>', unsafe_allow_html=True)
+    render_logo_header()
     st.markdown(
         """
         <div class="app-header">
@@ -819,7 +1120,7 @@ def render_home():
 PA_DIGIT_COLUMNS = {1: "ISCO_1Digit_Respondent"}
 
 
-def _normalize_isco_digit_code(raw_value, level: int) -> str | None:
+def _normalize_isco_digit_code(raw_value, level: int) -> Optional[str]:
     """Zamienia wartość z kolumny ISCO_{level}Digit_Respondent (np. wczytaną
     jako 7, 7.0 albo '07') na czysty, L-cyfrowy string kodu. Zwraca None,
     jeśli wartość jest pusta lub niepoprawna (np. za krótka/za długa)."""
@@ -856,7 +1157,10 @@ def render_pa_digit1_step(df, idx: int, row, df_state_key: str, idx_state_key: s
 
     _, _, _, _, metadata = load_embeddings_level(1)
     proposed_title = metadata.get(proposed_code, {}).get("title", "")
+    proposed_title_en = metadata.get(proposed_code, {}).get("title_en", "")
     title_txt = f" — {_lower_first(proposed_title)}" if proposed_title else ""
+    if proposed_title_en:
+        title_txt += f" (ang. {proposed_title_en})"
     st.markdown(f"**Przyporządkowana cyfra:** `{proposed_code}`{title_txt}")
 
     decision = st.radio(
@@ -901,6 +1205,8 @@ def render_pa_top10_step(df, idx: int, row, prefix: str, df_state_key: str, idx_
 
     target = _get_coding_target(df_state_key)
     cols = _target_cols(df_state_key)
+    n = len(df)
+    qualifying_positions = _qualifying_positions(df, target)
 
     model = load_model()
     title_emb, tasks_emb, synteza_emb, codes_ordered, metadata = load_embeddings()
@@ -925,8 +1231,15 @@ def render_pa_top10_step(df, idx: int, row, prefix: str, df_state_key: str, idx_
     ranking = st.session_state[cache_key]
 
     NO_MATCH_OPTION = "Brak poprawnego kodu (decyzja kodera)"
-    options = [f"{r.isco_code} — {_lower_first(r.title_pl)} (dopasowanie: {r.score:.3f})" for r in ranking.itertuples()]
+    NO_CODE_OPTION = "Brak możliwości zakodowania do kodu ISCO-08 (przejście do następnej osoby)"
+    fill_code = f"{prefix}000"
+    NO_DETERMINATION_OPTION = (
+        f"Brak możliwości ustalenia dokładnej cyfry (dopełnij pozostałe cyfry zerami, kod: {fill_code})"
+    )
+    options = [_format_candidate_label(r.isco_code, r.title_pl, getattr(r, "title_en", ""), r.score) for r in ranking.itertuples()]
+    options.append(NO_DETERMINATION_OPTION)
     options.append(NO_MATCH_OPTION)
+    options.append(NO_CODE_OPTION)
 
     choice = st.radio(
         "Wybierz właściwy kod ISCO-08",
@@ -938,17 +1251,28 @@ def render_pa_top10_step(df, idx: int, row, prefix: str, df_state_key: str, idx_
 
     decyzja_kodera_zawod = None
     decyzja_kodera_notatka = None
+    decyzja_kodera_kod = ""
+    is_uncodable = choice == NO_CODE_OPTION
+    is_no_determination = choice == NO_DETERMINATION_OPTION
 
     if choice == NO_MATCH_OPTION:
         chosen_code = None
-        decyzja_kodera_zawod = st.text_input(
-            "Proszę wpisać poprawny zawód", key=f"pa_top10_manual_zawod_{idx}"
+        decyzja_kodera_kod = st.text_input(
+            "Proszę wpisać poprawny kod ISCO-08",
+            key=f"pa_top10_manual_kod_{idx}",
+            max_chars=4,
         )
         decyzja_kodera_notatka = st.text_area(
             "Notatka - proszę opisać, o co chodzi w tym przypadku",
             key=f"pa_top10_manual_notatka_{idx}",
             height=80,
         )
+        if decyzja_kodera_kod.strip().isdigit() and len(decyzja_kodera_kod.strip()) == 4:
+            chosen_code = decyzja_kodera_kod.strip()
+    elif is_no_determination:
+        chosen_code = fill_code
+    elif is_uncodable:
+        chosen_code = None
     else:
         choice_idx = options.index(choice)
         chosen_code = ranking.iloc[choice_idx]["isco_code"]
@@ -964,15 +1288,37 @@ def render_pa_top10_step(df, idx: int, row, prefix: str, df_state_key: str, idx_
         key=f"pa_top10_ai_helpfulness_{idx}",
     )
 
+    # Opcjonalna notatka do wyboru - dostępna zawsze, niezależnie od tego, czy
+    # koder wybrał jeden z 10 dopasowanych kodów, czy "brak poprawnego kodu"
+    # (na wzór pola "Uzasadnienie / komentarz" z trybu kaskadowego).
+    uzasadnienie_top10 = st.text_area(
+        "Uzasadnienie / komentarz do wyboru (opcjonalnie)",
+        key=f"pa_top10_uzasadnienie_{idx}",
+        height=70,
+    )
+
     col_btn1, col_btn2 = st.columns(2)
     with col_btn1:
         if st.button("Zapisz wybór i przejdź dalej", use_container_width=True, key=f"pa_top10_save_{idx}"):
-            if choice == NO_MATCH_OPTION and not decyzja_kodera_zawod.strip():
-                st.warning("Proszę wpisać poprawny zawód przed zapisaniem.")
+            if choice == NO_MATCH_OPTION and not chosen_code:
+                st.warning("Proszę wpisać poprawny, 4-cyfrowy kod ISCO-08 przed zapisaniem.")
+            elif is_uncodable:
+                df.at[idx, "Brak_mozliwosci_zakodowania"] = "Tak"
+                if uzasadnienie_top10.strip():
+                    df.at[idx, "Uzasadnienie_finalne"] = uzasadnienie_top10.strip()
+                df.at[idx, "Kodowany_podmiot"] = target
+                _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_top10_1_5")
+                st.session_state[df_state_key] = df
+                st.session_state.pop(f"pa1_confirmed_{idx}", None)
+                st.session_state.pop(cache_key, None)
+                st.session_state[idx_state_key] = _next_qualifying_idx(qualifying_positions, idx, n)
+                st.rerun()
             else:
                 df.at[idx, "ISCO_wybrany"] = chosen_code
                 df.at[idx, "Decyzja_kodera_zawod"] = decyzja_kodera_zawod
                 df.at[idx, "Decyzja_kodera_notatka"] = decyzja_kodera_notatka
+                if uzasadnienie_top10.strip():
+                    df.at[idx, "Uzasadnienie_finalne"] = uzasadnienie_top10.strip()
                 if chosen_code:
                     df.at[idx, "ISCO_poziom1"] = chosen_code[0]
                     df.at[idx, "ISCO_poziom2"] = chosen_code[1]
@@ -987,15 +1333,16 @@ def render_pa_top10_step(df, idx: int, row, prefix: str, df_state_key: str, idx_
                 st.session_state[df_state_key] = df
                 st.session_state.pop(f"pa1_confirmed_{idx}", None)
                 st.session_state.pop(cache_key, None)
-                st.session_state[idx_state_key] = idx + 1
+                st.session_state[idx_state_key] = _next_qualifying_idx(qualifying_positions, idx, n)
                 st.rerun()
     with col_btn2:
+        prev_idx = _prev_qualifying_idx(qualifying_positions, idx)
         prev_label = "← Poprzedni partner" if target == "Partner" else "← Poprzedni respondent"
-        if idx > 0 and st.button(prev_label, use_container_width=True, key=f"pa_top10_prev_{idx}"):
-            st.session_state[f"hitl_wracal_{idx - 1}"] = True
+        if prev_idx != idx and st.button(prev_label, use_container_width=True, key=f"pa_top10_prev_{idx}"):
+            st.session_state[f"hitl_wracal_{prev_idx}"] = True
             st.session_state.pop(f"pa1_confirmed_{idx}", None)
             st.session_state.pop(cache_key, None)
-            st.session_state[idx_state_key] = idx - 1
+            st.session_state[idx_state_key] = prev_idx
             st.rerun()
 
     st.write("")
@@ -1018,6 +1365,7 @@ def render_pa_top10_step(df, idx: int, row, prefix: str, df_state_key: str, idx_
 def render_classify_hitl_1digit():
     st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
     st.markdown('<div class="top-bar"></div>', unsafe_allow_html=True)
+    render_logo_header()
 
     if st.button("← Wróć do strony głównej", key="back_hitl_1digit"):
         go_to("home")
@@ -1069,6 +1417,8 @@ def render_classify_hitl_1digit():
             df["Decyzja_kodera_notatka"] = None
         if "Kodowany_podmiot" not in df.columns:
             df["Kodowany_podmiot"] = None
+        if "Brak_mozliwosci_zakodowania" not in df.columns:
+            df["Brak_mozliwosci_zakodowania"] = None
         for col in ("ISCO_poziom1", "ISCO_poziom2", "ISCO_poziom3", "ISCO_poziom4", "ISCO_PRED"):
             if col not in df.columns:
                 df[col] = None
@@ -1100,33 +1450,101 @@ def render_classify_hitl_1digit():
             if col not in df.columns:
                 df[col] = None
 
+        # Wymuszenie właściwego dtype (patrz _ensure_text_column_dtype) - kluczowe
+        # przy WZNOWIENIU kodowania z częściowo wypełnionego pliku CSV, w którym
+        # pandas mógł błędnie nadać kolumnom z kodami ISCO-08 typ float64.
+        for col in (
+            "ISCO_wybrany",
+            "Decyzja_kodera_zawod",
+            "Decyzja_kodera_notatka",
+            "Kodowany_podmiot",
+            "Brak_mozliwosci_zakodowania",
+            "ISCO_poziom1",
+            "ISCO_poziom2",
+            "ISCO_poziom3",
+            "ISCO_poziom4",
+            "ISCO_PRED",
+            "Cyfra1_zatwierdzona_expert",
+            "Powod_odrzucenia_cyfry",
+            "ISCO_poziom1_zmienne",
+            "ISCO_poziom2_zmienne",
+            "ISCO_poziom3_zmienne",
+            "ISCO_poziom4_zmienne",
+            "Uzasadnienie_finalne",
+        ):
+            _ensure_text_column_dtype(df, col)
+        _ensure_object_dtype(df, "Czy_uzytkownik_wracal")
+
+
+        resume_target_1d = _get_coding_target("hitl1d_df")
+        resume_idx = _first_unfinished_idx(df, resume_target_1d)
         st.session_state["hitl1d_df"] = df
-        st.session_state["hitl1d_idx"] = 0
+        st.session_state["hitl1d_idx"] = resume_idx
         st.session_state["hitl1d_source"] = uploaded_file.name
+        if 0 < resume_idx < len(df):
+            _, resume_rank, resume_total = _qualifying_progress(
+                _qualifying_positions(df, resume_target_1d), resume_idx, len(df)
+            )
+            st.session_state["hitl1d_resume_msg"] = (
+                f"Wykryto częściowo wypełniony plik - wznowiono kodowanie od osoby nr {resume_rank} z {resume_total}."
+            )
+        elif resume_idx >= len(df) and len(df) > 0:
+            st.session_state["hitl1d_resume_msg"] = (
+                "Wykryto plik, w którym wszystkie osoby w bieżącym trybie są już zakodowane."
+            )
 
     df = st.session_state["hitl1d_df"]
     idx = st.session_state["hitl1d_idx"]
     n = len(df)
 
+    resume_msg = st.session_state.pop("hitl1d_resume_msg", None)
+    if resume_msg:
+        st.info(resume_msg)
     st.write("")
     render_mode_selector("hitl1d_df", "hitl1d_idx", df, idx, n)
     mode_1digit = _get_coding_target("hitl1d_df")
     _warn_if_meta_missing(mode_1digit)
     st.write("")
     podmiot_label = "Partner" if mode_1digit == "Partner" else "Respondent"
-    st.progress((idx) / n if n > 0 else 0, text=f"{podmiot_label} {min(idx + 1, n)} z {n}")
+    qualifying_positions_1d = _qualifying_positions(df, mode_1digit)
+    progress_fraction, progress_rank, progress_total = _qualifying_progress(qualifying_positions_1d, idx, n)
+    st.progress(progress_fraction, text=f"{podmiot_label} {progress_rank} z {progress_total}")
+
+    mode_suffix = "respondent" if mode_1digit == "Respondent" else "partner"
+
+    # Pobranie CZĘŚCIOWEGO wyniku - dostępne cały czas w trakcie kodowania
+    # (nie trzeba czekać na ukończenie całego pliku). Format pliku jest
+    # identyczny jak wynik końcowy, więc częściowy plik można bez przeszkód
+    # wgrać z powrotem później - aplikacja sama wznowi kodowanie od pierwszej
+    # nieukończonej osoby (patrz _first_unfinished_idx).
+    if idx < n:
+        with st.expander(f"Pobierz częściowy wynik (dotychczasowy postęp: {progress_rank - 1} z {progress_total})"):
+            partial_csv, partial_xlsx = _build_csv_xlsx_bytes(df)
+            col_pdl1, col_pdl2 = st.columns(2)
+            with col_pdl1:
+                st.download_button(
+                    "Pobierz częściowy wynik (CSV)",
+                    data=partial_csv,
+                    file_name=f"wynik_czesciowy_weryfikacji_1digit_{mode_suffix}.csv",
+                    mime="text/csv",
+                    use_container_width=True,
+                    key="hitl1d_partial_dl_csv",
+                )
+            with col_pdl2:
+                st.download_button(
+                    "Pobierz częściowy wynik (Excel .xlsx)",
+                    data=partial_xlsx,
+                    file_name=f"wynik_czesciowy_weryfikacji_1digit_{mode_suffix}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                    key="hitl1d_partial_dl_xlsx",
+                )
 
     if idx >= n:
         podmiot_plural = "partnerów" if mode_1digit == "Partner" else "respondentów"
         st.success(f"Zweryfikowano wszystkich {podmiot_plural}.")
 
-        mode_suffix = "respondent" if mode_1digit == "Respondent" else "partner"
-        csv_bytes = df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
-
-        xlsx_buffer = io.BytesIO()
-        with pd.ExcelWriter(xlsx_buffer, engine="openpyxl") as writer:
-            df.to_excel(writer, index=False, sheet_name="wyniki")
-        xlsx_bytes = xlsx_buffer.getvalue()
+        csv_bytes, xlsx_bytes = _build_csv_xlsx_bytes(df)
 
         col_dl1, col_dl2 = st.columns(2)
         with col_dl1:
@@ -1216,7 +1634,34 @@ def _mark_first_interaction(idx: int):
         st.session_state[key] = time.time()
 
 
-def _get_rank_and_score(candidates: pd.DataFrame, chosen_code) -> tuple[int | None, float | None]:
+def _build_csv_xlsx_bytes(df: pd.DataFrame) -> tuple[bytes, bytes]:
+    """Konwertuje dany DataFrame na bajty CSV (utf-8-sig, żeby polskie znaki
+    poprawnie otwierały się w Excelu) i XLSX (z automatycznym dopasowaniem
+    szerokości kolumn). Używane zarówno przy pobieraniu WYNIKU KOŃCOWEGO
+    (po ukończeniu kodowania), jak i przy pobraniu CZĘŚCIOWEGO postępu w
+    dowolnym momencie (patrz przycisk "Pobierz częściowy wynik" widoczny
+    cały czas podczas kodowania) - to ten sam format pliku w obu przypadkach,
+    więc częściowy plik można bez przeszkód wgrać z powrotem później i
+    aplikacja sama wznowi kodowanie od pierwszej nieukończonej osoby
+    (patrz _first_unfinished_idx)."""
+    csv_bytes = df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+
+    xlsx_buffer = io.BytesIO()
+    with pd.ExcelWriter(xlsx_buffer, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="wyniki")
+        worksheet = writer.sheets["wyniki"]
+        for i, col in enumerate(df.columns, start=1):
+            max_len = max(
+                df[col].apply(lambda v: len(str(v)) if pd.notna(v) else 0).max() if len(df) else 0,
+                len(str(col)),
+            )
+            worksheet.column_dimensions[worksheet.cell(row=1, column=i).column_letter].width = min(max_len + 2, 60)
+    xlsx_bytes = xlsx_buffer.getvalue()
+
+    return csv_bytes, xlsx_bytes
+
+
+def _get_rank_and_score(candidates: pd.DataFrame, chosen_code) -> Tuple[Optional[int], Optional[float]]:
     """Zwraca (pozycja_w_rankingu_1_indexed, score) wybranego kodu względem
     listy kandydatów pokazanej koderowi. None, gdy kod nie pochodzi z listy
     (np. wybrano "brak poprawnego kodu" / "brak możliwości ustalenia")."""
@@ -1231,7 +1676,7 @@ def _get_rank_and_score(candidates: pd.DataFrame, chosen_code) -> tuple[int | No
     return rank, score
 
 
-def _save_respondent_meta(df, idx: int, ai_helpfulness: int | None = None, ai_column: str | None = None):
+def _save_respondent_meta(df, idx: int, ai_helpfulness: Optional[int] = None, ai_column: Optional[str] = None):
     """Zapisuje czas kodowania (sekundy), czas do pierwszej interakcji z listą
     kandydatów, czy koder wracał (cofał się) i ocenę przydatności AI (1-5) -
     w kolumnie zależnej od trybu, którym koder faktycznie kodował tego
@@ -1269,6 +1714,8 @@ def render_cascade_step(df, idx: int, row, df_state_key: str = "hitl_df", idx_st
 
     target = _get_coding_target(df_state_key)
     cols = _target_cols(df_state_key)
+    n = len(df)
+    qualifying_positions = _qualifying_positions(df, target)
 
     model = load_model()
     title_emb, tasks_emb, synteza_emb, codes_ordered, metadata = load_embeddings_level(level)
@@ -1294,12 +1741,21 @@ def render_cascade_step(df, idx: int, row, df_state_key: str = "hitl_df", idx_st
     )
     show_no_determination = level > 1
 
+    # Na 1. kroku kaskady (grupa główna) koder może zamiast tego stwierdzić, że
+    # w ogóle nie jest w stanie zakodować danej osoby - wybranie tej opcji
+    # kończy kodowanie tej osoby od razu (bez wypełniania cyfr zerami) i
+    # przechodzi do kolejnej osoby.
+    NO_CODE_OPTION = "Brak możliwości zakodowania do kodu ISCO-08 (przejście do następnej osoby)"
+    show_no_code = level == 1
+
     options = [
-        f"{r.isco_code} — {_lower_first(r.title_pl)} (dopasowanie: {r.score:.3f})"
+        _format_candidate_label(r.isco_code, r.title_pl, getattr(r, "title_en", ""), r.score)
         for r in candidates.itertuples()
     ]
     if show_no_determination:
         options = options + [NO_DETERMINATION_OPTION]
+    if show_no_code:
+        options = options + [NO_CODE_OPTION]
 
     if not options:
         st.warning(
@@ -1310,6 +1766,7 @@ def render_cascade_step(df, idx: int, row, df_state_key: str = "hitl_df", idx_st
         uzasadnienie = ""
         ai_helpfulness = None
         is_no_determination = False
+        is_uncodable = False
         chosen_code = None
     else:
         choice = st.radio(
@@ -1320,8 +1777,9 @@ def render_cascade_step(df, idx: int, row, df_state_key: str = "hitl_df", idx_st
             args=(idx,),
         )
         is_no_determination = choice == NO_DETERMINATION_OPTION
+        is_uncodable = show_no_code and choice == NO_CODE_OPTION
 
-        if is_no_determination:
+        if is_no_determination or is_uncodable:
             chosen_code = None
             chosen_title = None
         else:
@@ -1369,7 +1827,7 @@ def render_cascade_step(df, idx: int, row, df_state_key: str = "hitl_df", idx_st
         # Komentarz i ocena AI pojawiają się tylko na ostatnim FAKTYCZNIE
         # osiągniętym poziomie szczegółowości: albo poziom 4, albo moment
         # wyboru "brak możliwości ustalenia dokładnej cyfry" (koniec kodowania).
-        show_uzasadnienie = level == 4 or is_no_determination
+        show_uzasadnienie = level == 4 or is_no_determination or is_uncodable
         if show_uzasadnienie:
             ai_helpfulness = st.slider(
                 "Jak pomocne były dopasowane kody podczas kodowania hierarchicznego?",
@@ -1402,7 +1860,12 @@ def render_cascade_step(df, idx: int, row, df_state_key: str = "hitl_df", idx_st
             st.rerun()
 
     with col_next:
-        next_label = "Zatwierdź kod finalny" if (level == 4 or is_no_determination) else "Dalej →"
+        if is_uncodable:
+            next_label = "Zapisz (brak możliwości zakodowania) i przejdź dalej"
+        elif level == 4 or is_no_determination:
+            next_label = "Zatwierdź kod finalny"
+        else:
+            next_label = "Dalej →"
         if options and st.button(next_label, type="primary", use_container_width=True, key=f"cascade_next_{idx}"):
             df.at[idx, f"ISCO_poziom{level}_zmienne"] = ", ".join(selected_vars) if selected_vars else None
             rank, score = _get_rank_and_score(candidates, chosen_code)
@@ -1416,7 +1879,19 @@ def render_cascade_step(df, idx: int, row, df_state_key: str = "hitl_df", idx_st
             # (_resp_table_key) zależy od aktualnego cascade_step_{idx} - nowy
             # poziom = zupełnie nowy widget, bez wcześniejszego zaznaczenia.
 
-            if is_no_determination:
+            if is_uncodable:
+                # Koder jednoznacznie stwierdził, że nie da się zakodować tej
+                # osoby do żadnego kodu ISCO-08 - nie wypełniamy cyfr zerami
+                # (to celowo inne od "brak możliwości ustalenia" na dalszych
+                # krokach), tylko oznaczamy przypadek i przechodzimy dalej.
+                df.at[idx, "Brak_mozliwosci_zakodowania"] = "Tak"
+                df.at[idx, "Kodowany_podmiot"] = target
+                _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_kaskadowo_1_5")
+                st.session_state[df_state_key] = df
+                _cancel_cascade(idx)
+                st.session_state[idx_state_key] = _next_qualifying_idx(qualifying_positions, idx, n)
+                st.rerun()
+            elif is_no_determination:
                 fill_count = 4 - len(digits)
                 digits.extend(["0"] * fill_count)
                 final_code = "".join(digits)
@@ -1430,7 +1905,7 @@ def render_cascade_step(df, idx: int, row, df_state_key: str = "hitl_df", idx_st
                 _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_kaskadowo_1_5")
                 st.session_state[df_state_key] = df
                 _cancel_cascade(idx)
-                st.session_state[idx_state_key] = idx + 1
+                st.session_state[idx_state_key] = _next_qualifying_idx(qualifying_positions, idx, n)
                 st.rerun()
             else:
                 new_digit = chosen_code[-1]
@@ -1448,7 +1923,7 @@ def render_cascade_step(df, idx: int, row, df_state_key: str = "hitl_df", idx_st
                     _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_kaskadowo_1_5")
                     st.session_state[df_state_key] = df
                     _cancel_cascade(idx)
-                    st.session_state[idx_state_key] = idx + 1
+                    st.session_state[idx_state_key] = _next_qualifying_idx(qualifying_positions, idx, n)
                     st.rerun()
                 else:
                     st.session_state[df_state_key] = df
@@ -1535,6 +2010,7 @@ def _handle_table_column_click(df, idx: int, row, var_meta: dict, selection_key:
 def render_classify_hitl():
     st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
     st.markdown('<div class="top-bar"></div>', unsafe_allow_html=True)
+    render_logo_header()
 
     if st.button("← Wróć do strony głównej", key="back_hitl"):
         go_to("home")
@@ -1582,6 +2058,8 @@ def render_classify_hitl():
             df["Decyzja_kodera_notatka"] = None
         if "Kodowany_podmiot" not in df.columns:
             df["Kodowany_podmiot"] = None
+        if "Brak_mozliwosci_zakodowania" not in df.columns:
+            df["Brak_mozliwosci_zakodowania"] = None
         for col in ("ISCO_poziom1", "ISCO_poziom2", "ISCO_poziom3", "ISCO_poziom4", "ISCO_PRED"):
             if col not in df.columns:
                 df[col] = None
@@ -1610,14 +2088,53 @@ def render_classify_hitl():
             if col not in df.columns:
                 df[col] = None
 
+        # Wymuszenie właściwego dtype (patrz _ensure_text_column_dtype) - kluczowe
+        # przy WZNOWIENIU kodowania z częściowo wypełnionego pliku CSV, w którym
+        # pandas mógł błędnie nadać kolumnom z kodami ISCO-08 typ float64.
+        for col in (
+            "ISCO_wybrany",
+            "Decyzja_kodera_zawod",
+            "Decyzja_kodera_notatka",
+            "Kodowany_podmiot",
+            "Brak_mozliwosci_zakodowania",
+            "ISCO_poziom1",
+            "ISCO_poziom2",
+            "ISCO_poziom3",
+            "ISCO_poziom4",
+            "ISCO_PRED",
+            "ISCO_poziom1_zmienne",
+            "ISCO_poziom2_zmienne",
+            "ISCO_poziom3_zmienne",
+            "ISCO_poziom4_zmienne",
+            "Uzasadnienie_finalne",
+        ):
+            _ensure_text_column_dtype(df, col)
+        _ensure_object_dtype(df, "Czy_uzytkownik_wracal")
+
+        resume_target_main = _get_coding_target("hitl_df")
+        resume_idx = _first_unfinished_idx(df, resume_target_main)
         st.session_state["hitl_df"] = df
-        st.session_state["hitl_idx"] = 0
+        st.session_state["hitl_idx"] = resume_idx
         st.session_state["hitl_source"] = uploaded_file.name
+        if 0 < resume_idx < len(df):
+            _, resume_rank, resume_total = _qualifying_progress(
+                _qualifying_positions(df, resume_target_main), resume_idx, len(df)
+            )
+            st.session_state["hitl_resume_msg"] = (
+                f"Wykryto częściowo wypełniony plik - wznowiono kodowanie od osoby nr {resume_rank} z {resume_total}."
+            )
+        elif resume_idx >= len(df) and len(df) > 0:
+            st.session_state["hitl_resume_msg"] = (
+                "Wykryto plik, w którym wszystkie osoby w bieżącym trybie są już zakodowane."
+            )
 
     df = st.session_state["hitl_df"]
     idx = st.session_state["hitl_idx"]
     n = len(df)
 
+    resume_msg = st.session_state.pop("hitl_resume_msg", None)
+    if resume_msg:
+        st.info(resume_msg)
     st.write("")
     render_mode_selector("hitl_df", "hitl_idx", df, idx, n)
     mode_main = _get_coding_target("hitl_df")
@@ -1626,66 +2143,87 @@ def render_classify_hitl():
     col_nav1, col_nav2 = st.columns([3, 1])
     with col_nav1:
         podmiot_label = "Partner" if mode_main == "Partner" else "Respondent"
-        st.progress((idx) / n if n > 0 else 0, text=f"{podmiot_label} {min(idx + 1, n)} z {n}")
+        qualifying_positions_main = _qualifying_positions(df, mode_main)
+        progress_fraction, progress_rank, progress_total = _qualifying_progress(qualifying_positions_main, idx, n)
+        st.progress(progress_fraction, text=f"{podmiot_label} {progress_rank} z {progress_total}")
     with col_nav2:
         with st.popover("Podgląd danych"):
             visible_df = visible_df_for_mode(df, mode_main)
             st.dataframe(visible_df, use_container_width=True, column_config=build_column_config(visible_df, load_var_metadata(mode_main)))
 
+    # Kolejność kolumn w eksporcie - ta sama zarówno dla wyniku KOŃCOWEGO
+    # (po ukończeniu kodowania), jak i dla podglądu/pobrania CZĘŚCIOWEGO
+    # postępu w dowolnym momencie (patrz przycisk niżej i sekcja "if idx >= n").
+    ref_cols = [c for c in ["B33", "B34", "B35", "B48", "B49", "B50", "ISCO08"] if c in df.columns]
+    result_cols = [
+        "Kodowany_podmiot",
+        "Brak_mozliwosci_zakodowania",
+        "ISCO_wybrany",
+        "ISCO_poziom1",
+        "ISCO_poziom1_zmienne",
+        "ISCO_poziom1_ranking_pozycja",
+        "ISCO_poziom1_score",
+        "ISCO_poziom2",
+        "ISCO_poziom2_zmienne",
+        "ISCO_poziom2_ranking_pozycja",
+        "ISCO_poziom2_score",
+        "ISCO_poziom3",
+        "ISCO_poziom3_zmienne",
+        "ISCO_poziom3_ranking_pozycja",
+        "ISCO_poziom3_score",
+        "ISCO_poziom4",
+        "ISCO_poziom4_zmienne",
+        "ISCO_poziom4_ranking_pozycja",
+        "ISCO_poziom4_score",
+        "ISCO_PRED",
+        "Ranking_pozycja_wybranego_kodu",
+        "Score_wybranego_kodu",
+        "Uzasadnienie_finalne",
+        "Decyzja_kodera_zawod",
+        "Decyzja_kodera_notatka",
+        "Czas_kodowania_sekundy",
+        "Czas_do_pierwszej_interakcji_sekundy",
+        "Czy_uzytkownik_wracal",
+        "Ocena_AI_top10_1_5",
+        "Ocena_AI_kaskadowo_1_5",
+    ]
+    other_cols = [c for c in df.columns if c not in ref_cols and c not in result_cols]
+    export_df = df[other_cols + ref_cols + result_cols].copy()
+    mode_suffix = "respondent" if mode_main == "Respondent" else "partner"
+
+    # Pobranie CZĘŚCIOWEGO wyniku - dostępne cały czas w trakcie kodowania
+    # (nie trzeba czekać na ukończenie całego pliku). Format pliku jest
+    # identyczny jak wynik końcowy, więc częściowy plik można bez przeszkód
+    # wgrać z powrotem później - aplikacja sama wznowi kodowanie od pierwszej
+    # nieukończonej osoby (patrz _first_unfinished_idx).
+    if idx < n:
+        with st.expander(f"Pobierz częściowy wynik (dotychczasowy postęp: {progress_rank - 1} z {progress_total})"):
+            partial_csv, partial_xlsx = _build_csv_xlsx_bytes(export_df)
+            col_pdl1, col_pdl2 = st.columns(2)
+            with col_pdl1:
+                st.download_button(
+                    "Pobierz częściowy wynik (CSV)",
+                    data=partial_csv,
+                    file_name=f"wynik_czesciowy_klasyfikacji_ekspert_{mode_suffix}.csv",
+                    mime="text/csv",
+                    use_container_width=True,
+                    key="hitl_partial_dl_csv",
+                )
+            with col_pdl2:
+                st.download_button(
+                    "Pobierz częściowy wynik (Excel .xlsx)",
+                    data=partial_xlsx,
+                    file_name=f"wynik_czesciowy_klasyfikacji_ekspert_{mode_suffix}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                    key="hitl_partial_dl_xlsx",
+                )
+
     if idx >= n:
         podmiot_plural = "partnerów" if mode_main == "Partner" else "respondentów"
         st.success(f"Sklasyfikowano wszystkich {podmiot_plural}.")
 
-        ref_cols = [c for c in ["B33", "B34", "B35", "B48", "B49", "B50", "ISCO08"] if c in df.columns]
-        result_cols = [
-            "Kodowany_podmiot",
-            "ISCO_wybrany",
-            "ISCO_poziom1",
-            "ISCO_poziom1_zmienne",
-            "ISCO_poziom1_ranking_pozycja",
-            "ISCO_poziom1_score",
-            "ISCO_poziom2",
-            "ISCO_poziom2_zmienne",
-            "ISCO_poziom2_ranking_pozycja",
-            "ISCO_poziom2_score",
-            "ISCO_poziom3",
-            "ISCO_poziom3_zmienne",
-            "ISCO_poziom3_ranking_pozycja",
-            "ISCO_poziom3_score",
-            "ISCO_poziom4",
-            "ISCO_poziom4_zmienne",
-            "ISCO_poziom4_ranking_pozycja",
-            "ISCO_poziom4_score",
-            "ISCO_PRED",
-            "Ranking_pozycja_wybranego_kodu",
-            "Score_wybranego_kodu",
-            "Uzasadnienie_finalne",
-            "Decyzja_kodera_zawod",
-            "Decyzja_kodera_notatka",
-            "Czas_kodowania_sekundy",
-            "Czas_do_pierwszej_interakcji_sekundy",
-            "Czy_uzytkownik_wracal",
-            "Ocena_AI_top10_1_5",
-            "Ocena_AI_kaskadowo_1_5",
-        ]
-        other_cols = [c for c in df.columns if c not in ref_cols and c not in result_cols]
-        final_df = df[other_cols + ref_cols + result_cols].copy()
-
-        csv_bytes = final_df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
-
-        xlsx_buffer = io.BytesIO()
-        with pd.ExcelWriter(xlsx_buffer, engine="openpyxl") as writer:
-            final_df.to_excel(writer, index=False, sheet_name="wyniki")
-            worksheet = writer.sheets["wyniki"]
-            for i, col in enumerate(final_df.columns, start=1):
-                max_len = max(
-                    final_df[col].apply(lambda v: len(str(v)) if pd.notna(v) else 0).max() if len(final_df) else 0,
-                    len(str(col)),
-                )
-                worksheet.column_dimensions[worksheet.cell(row=1, column=i).column_letter].width = min(max_len + 2, 60)
-        xlsx_bytes = xlsx_buffer.getvalue()
-
-        mode_suffix = "respondent" if mode_main == "Respondent" else "partner"
+        csv_bytes, xlsx_bytes = _build_csv_xlsx_bytes(export_df)
 
         col_dl1, col_dl2 = st.columns(2)
         with col_dl1:
@@ -1740,6 +2278,7 @@ def render_classify_hitl():
         return
 
     target = _get_coding_target("hitl_df")
+    qualifying_positions = _qualifying_positions(df, target)
 
     model = load_model()
     title_emb, tasks_emb, synteza_emb, codes_ordered, metadata = load_embeddings()
@@ -1763,8 +2302,10 @@ def render_classify_hitl():
     ranking = st.session_state[cache_key]
 
     NO_MATCH_OPTION = "Brak poprawnego kodu (decyzja kodera)"
-    options = [f"{r.isco_code} — {_lower_first(r.title_pl)} (dopasowanie: {r.score:.3f})" for r in ranking.itertuples()]
+    NO_CODE_OPTION = "Brak możliwości zakodowania do kodu ISCO-08 (przejście do następnej osoby)"
+    options = [_format_candidate_label(r.isco_code, r.title_pl, getattr(r, "title_en", ""), r.score) for r in ranking.itertuples()]
     options.append(NO_MATCH_OPTION)
+    options.append(NO_CODE_OPTION)
 
     choice = st.radio(
         "Wybierz właściwy kod ISCO-08",
@@ -1776,18 +2317,27 @@ def render_classify_hitl():
 
     decyzja_kodera_zawod = None
     decyzja_kodera_notatka = None
+    decyzja_kodera_kod = ""
+    is_uncodable = choice == NO_CODE_OPTION
 
     if choice == NO_MATCH_OPTION:
         chosen_code = None
         chosen_title = None
-        decyzja_kodera_zawod = st.text_input(
-            "Proszę wpisać poprawny zawód", key=f"hitl_manual_zawod_{idx}"
+        decyzja_kodera_kod = st.text_input(
+            "Proszę wpisać poprawny kod ISCO-08",
+            key=f"hitl_manual_kod_{idx}",
+            max_chars=4,
         )
         decyzja_kodera_notatka = st.text_area(
             "Notatka - proszę opisać, o co chodzi w tym przypadku",
             key=f"hitl_manual_notatka_{idx}",
             height=80,
         )
+        if decyzja_kodera_kod.strip().isdigit() and len(decyzja_kodera_kod.strip()) == 4:
+            chosen_code = decyzja_kodera_kod.strip()
+    elif is_uncodable:
+        chosen_code = None
+        chosen_title = None
     else:
         choice_idx = options.index(choice)
         chosen_code = ranking.iloc[choice_idx]["isco_code"]
@@ -1804,28 +2354,49 @@ def render_classify_hitl():
         key=f"hitl_ai_helpfulness_{idx}",
     )
 
+    # Opcjonalna notatka do wyboru - dostępna zawsze, niezależnie od tego, czy
+    # koder wybrał jeden z 10 dopasowanych kodów, czy "brak poprawnego kodu"
+    # (na wzór pola "Uzasadnienie / komentarz" z trybu kaskadowego).
+    uzasadnienie_top10 = st.text_area(
+        "Uzasadnienie / komentarz do wyboru (opcjonalnie)",
+        key=f"hitl_uzasadnienie_{idx}",
+        height=70,
+    )
+
     col_btn1, col_btn2 = st.columns(2)
     with col_btn1:
         if st.button("Zapisz wybór i przejdź dalej", use_container_width=True):
-            if choice == NO_MATCH_OPTION and not decyzja_kodera_zawod.strip():
-                st.warning("Proszę wpisać poprawny zawód przed zapisaniem.")
+            if choice == NO_MATCH_OPTION and not chosen_code:
+                st.warning("Proszę wpisać poprawny, 4-cyfrowy kod ISCO-08 przed zapisaniem.")
+            elif is_uncodable:
+                df.at[idx, "Brak_mozliwosci_zakodowania"] = "Tak"
+                if uzasadnienie_top10.strip():
+                    df.at[idx, "Uzasadnienie_finalne"] = uzasadnienie_top10.strip()
+                df.at[idx, "Kodowany_podmiot"] = target
+                _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_top10_1_5")
+                st.session_state["hitl_df"] = df
+                st.session_state["hitl_idx"] = _next_qualifying_idx(qualifying_positions, idx, n)
+                st.rerun()
             else:
                 df.at[idx, "ISCO_wybrany"] = chosen_code
                 df.at[idx, "Decyzja_kodera_zawod"] = decyzja_kodera_zawod
                 df.at[idx, "Decyzja_kodera_notatka"] = decyzja_kodera_notatka
+                if uzasadnienie_top10.strip():
+                    df.at[idx, "Uzasadnienie_finalne"] = uzasadnienie_top10.strip()
                 rank, score = _get_rank_and_score(ranking, chosen_code)
                 df.at[idx, "Ranking_pozycja_wybranego_kodu"] = rank
                 df.at[idx, "Score_wybranego_kodu"] = score
                 df.at[idx, "Kodowany_podmiot"] = target
                 _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_top10_1_5")
                 st.session_state["hitl_df"] = df
-                st.session_state["hitl_idx"] = idx + 1
+                st.session_state["hitl_idx"] = _next_qualifying_idx(qualifying_positions, idx, n)
                 st.rerun()
     with col_btn2:
+        prev_idx = _prev_qualifying_idx(qualifying_positions, idx)
         prev_label = "← Poprzedni partner" if target == "Partner" else "← Poprzedni respondent"
-        if idx > 0 and st.button(prev_label, use_container_width=True):
-            st.session_state[f"hitl_wracal_{idx - 1}"] = True
-            st.session_state["hitl_idx"] = idx - 1
+        if prev_idx != idx and st.button(prev_label, use_container_width=True):
+            st.session_state[f"hitl_wracal_{prev_idx}"] = True
+            st.session_state["hitl_idx"] = prev_idx
             st.rerun()
 
     st.write("")
@@ -1846,6 +2417,14 @@ def render_classify_hitl():
 # ROUTER
 # ============================================================
 require_login()
+
+with st.sidebar:
+    st.caption(f"Zalogowano: {st.session_state.get('username', '')}")
+    if st.button("Wyloguj", use_container_width=True):
+        for key in ("authenticated", "username"):
+            st.session_state.pop(key, None)
+        st.session_state.page = "home"
+        st.rerun()
 
 if st.session_state.page == "home":
     render_home()

@@ -23,33 +23,26 @@ Wynik: 4 osobne foldery korpusu, gotowe do podania na wejście build_embeddings.
 Odpalić RAZ (lub po każdej zmianie danych źródłowych):
 
     conda activate isco_rag
-    cd ~/Desktop/App_2Mod_RP2
+    cd ESS_ISCO_APP
     python export_isco_corpus.py
 """
 
 import json
-import os
 import re
 from pathlib import Path
 
 import pandas as pd
 
-# Ścieżka do folderu roboczego projektu - ustawiona na sztywno, żeby nie trzeba
-# było pamiętać o "cd" przed odpaleniem skryptu. Zmień, jeśli projekt leży gdzie indziej.
-WORKDIR = "/Users/mblaszczykowski/Desktop/App_2Mod_RP2"
-if os.path.isdir(WORKDIR):
-    os.chdir(WORKDIR)
-else:
-    print(f"UWAGA: nie znaleziono folderu {WORKDIR} - zostaję w bieżącym katalogu roboczym.")
+APP_DIR = Path(__file__).resolve().parent
 
 # ============================================================
 # KONFIGURACJA POZIOMÓW
 # ============================================================
 LEVEL_CONFIG = {
-    1: {"xlsx": "Level_1.xlsx", "out_dir": "isco_corpus_L1"},
-    2: {"xlsx": "Level_2.xlsx", "out_dir": "isco_corpus_L2"},
-    3: {"xlsx": "Level_3.xlsx", "out_dir": "isco_corpus_L3"},
-    4: {"xlsx": "Level_4.xlsx", "out_dir": "isco_corpus_L4"},
+    1: {"xlsx": APP_DIR / "Level_1.xlsx", "out_dir": APP_DIR / "isco_corpus_L1"},
+    2: {"xlsx": APP_DIR / "Level_2.xlsx", "out_dir": APP_DIR / "isco_corpus_L2"},
+    3: {"xlsx": APP_DIR / "Level_3.xlsx", "out_dir": APP_DIR / "isco_corpus_L3"},
+    4: {"xlsx": APP_DIR / "Level_4.xlsx", "out_dir": APP_DIR / "isco_corpus_L4"},
 }
 
 # Nowy format plików źródłowych - tylko 3 pola treściowe. Klucz = nazwa pliku
