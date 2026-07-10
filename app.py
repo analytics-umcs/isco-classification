@@ -730,11 +730,11 @@ def _reset_module_progress(df_state_key: str, idx_state_key: str, df=None, targe
     nieukończoną osobę w trybie `target_mode` (patrz _first_unfinished_idx) -
     dzięki temu powrót do drugiego trybu (np. z Respondentów na Partnerów)
     też trafia tam, gdzie koder poprzednio skończył, a nie zawsze na start."""
-    clear_prefixes = ("hitl_", "hitl1d_", "cascade_", "pa1_", "pa_top10_", "resp_table_")
+    clear_prefixes = ("manual_", "hitl_", "hitl1d_", "cascade_", "pa1_", "pa_top10_", "resp_table_")
     keep_keys = {
         df_state_key,
         idx_state_key,
-        "hitl_source", "hitl1d_source",
+        "manual_source", "hitl_source", "hitl1d_source",
         "hitl_source_cols", "hitl1d_source_cols",
         _mode_key(df_state_key),
     }
@@ -1112,26 +1112,332 @@ def render_home():
     st.write("")
     st.write("")
 
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
 
     with col1:
         with st.container(border=True):
             st.markdown(
-                '<div class="module-card-title">Klasyfikacja zawodów<br>z udziałem&nbsp;eksperta</div>',
+                '<div class="module-card-title">Metoda A'
+                '<span class="module-card-sub">kodowanie ręczne</span></div>',
+                unsafe_allow_html=True,
+            )
+            if st.button("Otwórz", key="btn_manual", use_container_width=True):
+                go_to("classify_manual")
+
+    with col2:
+        with st.container(border=True):
+            st.markdown(
+                '<div class="module-card-title">Metoda B'
+                '<span class="module-card-sub">Klasyfikacja zawodów<br>z udziałem&nbsp;eksperta</span></div>',
                 unsafe_allow_html=True,
             )
             if st.button("Otwórz", key="btn_hitl", use_container_width=True):
                 go_to("classify_hitl")
 
-    with col2:
+    with col3:
         with st.container(border=True):
             st.markdown(
-                '<div class="module-card-title">Klasyfikacja zawodów<br>z udziałem&nbsp;eksperta'
-                '<span class="module-card-sub">(1&nbsp;cyfra&nbsp;przyporządkowana)</span></div>',
+                '<div class="module-card-title">Metoda C'
+                '<span class="module-card-sub">Klasyfikacja zawodów<br>z udziałem&nbsp;eksperta'
+                '<br>(1&nbsp;cyfra&nbsp;przyporządkowana)</span></div>',
                 unsafe_allow_html=True,
             )
             if st.button("Otwórz", key="btn_hitl_1digit", use_container_width=True):
                 go_to("classify_hitl_1digit")
+
+
+# ============================================================
+# STRONA: METODA A (KODOWANIE RĘCZNE)
+# ============================================================
+def _manual_level_options(level: int, prefix: str = "") -> list[dict]:
+    _, _, _, codes_ordered, metadata = load_embeddings_level(level)
+    codes = sorted(code for code in codes_ordered if not prefix or code.startswith(prefix))
+    options = [
+        {
+            "code": code,
+            "label": _format_candidate_label(
+                code,
+                metadata[code]["title"],
+                metadata[code].get("title_en", ""),
+                None,
+            ),
+        }
+        for code in codes
+    ]
+    return options + [{"code": "__NO_MATCH__", "label": "Nic nie pasuje"}]
+
+
+def _init_manual_result_columns(df: pd.DataFrame) -> None:
+    if "ISCO_wybrany" not in df.columns:
+        df["ISCO_wybrany"] = None
+        df["Decyzja_kodera_zawod"] = None
+        df["Decyzja_kodera_notatka"] = None
+    if "Kodowany_podmiot" not in df.columns:
+        df["Kodowany_podmiot"] = None
+    if "Brak_mozliwosci_zakodowania" not in df.columns:
+        df["Brak_mozliwosci_zakodowania"] = None
+    for col in ("ISCO_poziom1", "ISCO_poziom2", "ISCO_poziom3", "ISCO_poziom4", "ISCO_PRED"):
+        if col not in df.columns:
+            df[col] = None
+    for col in (
+        "Uzasadnienie_finalne",
+        "Czas_kodowania_sekundy",
+        "Czas_do_pierwszej_interakcji_sekundy",
+        "Czy_uzytkownik_wracal",
+    ):
+        if col not in df.columns:
+            df[col] = None
+    for col in (
+        "ISCO_wybrany",
+        "Decyzja_kodera_zawod",
+        "Decyzja_kodera_notatka",
+        "Kodowany_podmiot",
+        "Brak_mozliwosci_zakodowania",
+        "ISCO_poziom1",
+        "ISCO_poziom2",
+        "ISCO_poziom3",
+        "ISCO_poziom4",
+        "ISCO_PRED",
+        "Uzasadnienie_finalne",
+    ):
+        _ensure_text_column_dtype(df, col)
+    _ensure_object_dtype(df, "Czy_uzytkownik_wracal")
+
+
+def _manual_reset_idx(idx: int) -> None:
+    st.session_state[f"manual_step_{idx}"] = 1
+    st.session_state[f"manual_digits_{idx}"] = []
+
+
+def render_manual_step(df, idx: int, row, df_state_key: str = "manual_df", idx_state_key: str = "manual_idx"):
+    level = st.session_state.setdefault(f"manual_step_{idx}", 1)
+    digits = st.session_state.setdefault(f"manual_digits_{idx}", [])
+    prefix = "".join(digits)
+
+    st.info(f"**{LEVEL_LABELS[level]}**" + (f" — dotychczas wybrany prefiks kodu: `{prefix}`" if prefix else ""))
+
+    options_data = _manual_level_options(level, prefix)
+    label_to_code = {item["label"]: item["code"] for item in options_data}
+    labels = [item["label"] for item in options_data]
+    choice = st.radio(
+        "Wybierz kod dla tego poziomu",
+        options=labels,
+        index=None,
+        key=f"manual_choice_{idx}_{level}_{prefix}",
+        on_change=_mark_first_interaction,
+        args=(idx,),
+    )
+
+    uzasadnienie = st.text_area(
+        "Uzasadnienie / komentarz do finalnej decyzji (opcjonalnie)",
+        key=f"manual_uzasadnienie_{idx}_{level}_{prefix}",
+        height=70,
+    )
+
+    target = _get_coding_target(df_state_key)
+    n = len(df)
+    qualifying_positions = _qualifying_positions(df, target)
+
+    col_back, col_next = st.columns(2)
+    with col_back:
+        if level > 1 and st.button("← Cofnij krok", use_container_width=True, key=f"manual_back_{idx}"):
+            digits.pop()
+            st.session_state[f"manual_step_{idx}"] = level - 1
+            st.session_state[f"hitl_wracal_{idx}"] = True
+            st.rerun()
+
+    with col_next:
+        next_label = "Zatwierdź kod finalny" if level == 4 else "Dalej →"
+        if st.button(next_label, type="primary", use_container_width=True, key=f"manual_next_{idx}_{level}_{prefix}"):
+            if choice is None:
+                st.warning("Wybierz jedną opcję przed przejściem dalej.")
+                return
+
+            chosen_code = label_to_code[choice]
+            if chosen_code == "__NO_MATCH__":
+                final_code = (prefix + "0" * (5 - level))[:4]
+                df.at[idx, "ISCO_poziom1"] = final_code[0]
+                df.at[idx, "ISCO_poziom2"] = final_code[1]
+                df.at[idx, "ISCO_poziom3"] = final_code[2]
+                df.at[idx, "ISCO_poziom4"] = final_code[3]
+                df.at[idx, "ISCO_PRED"] = final_code
+                df.at[idx, "ISCO_wybrany"] = final_code
+                df.at[idx, "Kodowany_podmiot"] = target
+                if uzasadnienie.strip():
+                    df.at[idx, "Uzasadnienie_finalne"] = uzasadnienie.strip()
+                    df.at[idx, "Decyzja_kodera_notatka"] = uzasadnienie.strip()
+                _save_respondent_meta(df, idx)
+                st.session_state[df_state_key] = df
+                st.session_state.pop(f"manual_step_{idx}", None)
+                st.session_state.pop(f"manual_digits_{idx}", None)
+                st.session_state[idx_state_key] = _next_qualifying_idx(qualifying_positions, idx, n)
+                st.rerun()
+            elif level < 4:
+                digits.append(chosen_code[-1])
+                df.at[idx, f"ISCO_poziom{level}"] = chosen_code[-1]
+                st.session_state[df_state_key] = df
+                st.session_state[f"manual_step_{idx}"] = level + 1
+                st.rerun()
+            else:
+                final_code = chosen_code
+                df.at[idx, "ISCO_poziom1"] = final_code[0]
+                df.at[idx, "ISCO_poziom2"] = final_code[1]
+                df.at[idx, "ISCO_poziom3"] = final_code[2]
+                df.at[idx, "ISCO_poziom4"] = final_code[3]
+                df.at[idx, "ISCO_PRED"] = final_code
+                df.at[idx, "ISCO_wybrany"] = final_code
+                df.at[idx, "Kodowany_podmiot"] = target
+                if uzasadnienie.strip():
+                    df.at[idx, "Uzasadnienie_finalne"] = uzasadnienie.strip()
+                    df.at[idx, "Decyzja_kodera_notatka"] = uzasadnienie.strip()
+                _save_respondent_meta(df, idx)
+                st.session_state[df_state_key] = df
+                st.session_state.pop(f"manual_step_{idx}", None)
+                st.session_state.pop(f"manual_digits_{idx}", None)
+                st.session_state[idx_state_key] = _next_qualifying_idx(qualifying_positions, idx, n)
+                st.rerun()
+
+
+def render_classify_manual():
+    st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+    st.markdown('<div class="top-bar"></div>', unsafe_allow_html=True)
+    render_logo_header()
+
+    if st.button("← Wróć do strony głównej", key="back_manual"):
+        go_to("home")
+        st.rerun()
+
+    st.markdown(
+        '<h1 style="text-align:center; line-height:1.3;">Metoda A<br>'
+        '<span style="font-size:0.6em;">kodowanie ręczne</span></h1>',
+        unsafe_allow_html=True,
+    )
+    st.write(
+        "Wczytaj plik CSV zawierający dane ankietowe European Social Survey (ESS). "
+        "Ekspert wybiera kod ISCO-08 ręcznie, poziom po poziomie, z pełnych list "
+        "kodów uporządkowanych rosnąco."
+    )
+
+    uploaded_file = st.file_uploader("Wybierz plik CSV", type=["csv"], key="uploader_manual")
+
+    if uploaded_file is None:
+        st.session_state.pop("manual_df", None)
+        st.session_state.pop("manual_idx", None)
+        return
+
+    if "manual_df" not in st.session_state or st.session_state.get("manual_source") != uploaded_file.name:
+        df = read_csv_robust(uploaded_file)
+        for col in ("B33", "B34", "B35", "B48", "B49", "B50"):
+            if col not in df.columns:
+                st.error(f"W pliku nie znaleziono wymaganej kolumny: {col}")
+                return
+
+        _init_manual_result_columns(df)
+        resume_target_manual = _get_coding_target("manual_df")
+        resume_idx = _first_unfinished_idx(df, resume_target_manual)
+        st.session_state["manual_df"] = df
+        st.session_state["manual_idx"] = resume_idx
+        st.session_state["manual_source"] = uploaded_file.name
+        if 0 < resume_idx < len(df):
+            _, resume_rank, resume_total = _qualifying_progress(
+                _qualifying_positions(df, resume_target_manual), resume_idx, len(df)
+            )
+            st.session_state["manual_resume_msg"] = (
+                f"Wykryto częściowo wypełniony plik - wznowiono kodowanie od osoby nr {resume_rank} z {resume_total}."
+            )
+        elif resume_idx >= len(df) and len(df) > 0:
+            st.session_state["manual_resume_msg"] = (
+                "Wykryto plik, w którym wszystkie osoby w bieżącym trybie są już zakodowane."
+            )
+
+    df = st.session_state["manual_df"]
+    idx = st.session_state["manual_idx"]
+    n = len(df)
+
+    resume_msg = st.session_state.pop("manual_resume_msg", None)
+    if resume_msg:
+        st.info(resume_msg)
+
+    st.write("")
+    render_mode_selector("manual_df", "manual_idx", df, idx, n)
+    mode_manual = _get_coding_target("manual_df")
+    _warn_if_meta_missing(mode_manual)
+    st.write("")
+
+    podmiot_label = "Partner" if mode_manual == "Partner" else "Respondent"
+    qualifying_positions_manual = _qualifying_positions(df, mode_manual)
+    progress_fraction, progress_rank, progress_total = _qualifying_progress(qualifying_positions_manual, idx, n)
+    st.progress(progress_fraction, text=f"{podmiot_label} {progress_rank} z {progress_total}")
+
+    mode_suffix = "respondent" if mode_manual == "Respondent" else "partner"
+
+    if idx < n:
+        with st.expander(f"Pobierz częściowy wynik (dotychczasowy postęp: {progress_rank - 1} z {progress_total})"):
+            partial_csv, partial_xlsx = _build_csv_xlsx_bytes(df)
+            col_pdl1, col_pdl2 = st.columns(2)
+            with col_pdl1:
+                st.download_button(
+                    "Pobierz częściowy wynik (CSV)",
+                    data=partial_csv,
+                    file_name=f"wynik_czesciowy_metoda_a_{mode_suffix}.csv",
+                    mime="text/csv",
+                    use_container_width=True,
+                    key="manual_partial_dl_csv",
+                )
+            with col_pdl2:
+                st.download_button(
+                    "Pobierz częściowy wynik (Excel .xlsx)",
+                    data=partial_xlsx,
+                    file_name=f"wynik_czesciowy_metoda_a_{mode_suffix}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                    key="manual_partial_dl_xlsx",
+                )
+
+    if idx >= n:
+        podmiot_plural = "partnerów" if mode_manual == "Partner" else "respondentów"
+        st.success(f"Zakodowano wszystkich {podmiot_plural}.")
+        csv_bytes, xlsx_bytes = _build_csv_xlsx_bytes(df)
+
+        col_dl1, col_dl2 = st.columns(2)
+        with col_dl1:
+            st.download_button(
+                "Pobierz wynik (CSV)",
+                data=csv_bytes,
+                file_name=f"wynik_metoda_a_{mode_suffix}.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
+        with col_dl2:
+            st.download_button(
+                "Pobierz wynik (Excel .xlsx)",
+                data=xlsx_bytes,
+                file_name=f"wynik_metoda_a_{mode_suffix}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+            )
+        return
+
+    row = df.iloc[idx]
+    st.session_state.setdefault(f"hitl_start_time_{idx}", time.time())
+    st.session_state.setdefault(f"hitl_wracal_{idx}", False)
+    st.session_state.setdefault(f"manual_step_{idx}", 1)
+    st.session_state.setdefault(f"manual_digits_{idx}", [])
+
+    st.write("Dane respondenta:")
+    st.dataframe(
+        visible_df_for_mode(df.iloc[[idx]], mode_manual),
+        use_container_width=True,
+        column_config=build_column_config_for_respondent(row, load_var_metadata(mode_manual)),
+    )
+
+    cols = _target_cols("manual_df")
+    with st.container(border=True):
+        st.markdown(f"**Zawód:** {row[cols['zawod']]}")
+        st.markdown(f"**Obowiązki i zadania:** {row[cols['obowiazki']]}")
+        st.markdown(f"**Wykształcenie:** {row[cols['wyksztalcenie']]}")
+
+    render_manual_step(df, idx, row)
 
 
 # ============================================================
@@ -2446,6 +2752,8 @@ with st.sidebar:
 
 if st.session_state.page == "home":
     render_home()
+elif st.session_state.page == "classify_manual":
+    render_classify_manual()
 elif st.session_state.page == "classify_hitl":
     render_classify_hitl()
 elif st.session_state.page == "classify_hitl_1digit":
