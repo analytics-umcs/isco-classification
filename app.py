@@ -9,6 +9,7 @@ from typing import Optional, Tuple
 import numpy as np
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 import ollama
 
 # Resolve bundled assets and embeddings from the app directory regardless of
@@ -595,6 +596,21 @@ def _ensure_object_dtype(df: pd.DataFrame, col: str) -> None:
     tylko dopuścić dowolny typ przy kolejnych zapisach."""
     if col in df.columns and df[col].dtype != "object":
         df[col] = df[col].astype("object")
+
+
+def _display_respondent_idno(row: pd.Series) -> None:
+    """Pokazuje IDNO niezależnie od jego wielkości liter i typu z CSV."""
+    idno_col = next((col for col in row.index if str(col).strip().lower() == "idno"), None)
+    if idno_col is None or pd.isna(row[idno_col]):
+        st.warning("Brak numeru IDNO dla tego respondenta.")
+        return
+
+    value = row[idno_col]
+    if isinstance(value, float) and value.is_integer():
+        value = str(int(value))
+    else:
+        value = str(value).strip()
+    st.info(f"**IDNO respondenta: `{value}`**")
 
 
 QUALIFYING_FLAG_COLUMNS = {
@@ -1209,6 +1225,67 @@ def _manual_reset_idx(idx: int) -> None:
     st.session_state[f"manual_digits_{idx}"] = []
 
 
+def _manual_save_code(
+    df,
+    idx: int,
+    final_code: str,
+    target: str,
+    uzasadnienie: str,
+    df_state_key: str,
+    idx_state_key: str,
+    qualifying_positions: list[int],
+) -> None:
+    """Zapisuje kompletną decyzję Metody A i przechodzi do następnego przypadku."""
+    for level, digit in enumerate(final_code, start=1):
+        df.at[idx, f"ISCO_poziom{level}"] = digit
+    df.at[idx, "ISCO_PRED"] = final_code
+    df.at[idx, "ISCO_wybrany"] = final_code
+    df.at[idx, "Kodowany_podmiot"] = target
+    df.at[idx, "Brak_mozliwosci_zakodowania"] = None
+    if uzasadnienie.strip():
+        df.at[idx, "Uzasadnienie_finalne"] = uzasadnienie.strip()
+        df.at[idx, "Decyzja_kodera_notatka"] = uzasadnienie.strip()
+    else:
+        # Przy ponownym kodowaniu nie pozostawiamy komentarza ze starej decyzji.
+        df.at[idx, "Uzasadnienie_finalne"] = None
+        df.at[idx, "Decyzja_kodera_notatka"] = None
+    _save_respondent_meta(df, idx)
+    st.session_state[df_state_key] = df
+    st.session_state.pop(f"manual_step_{idx}", None)
+    st.session_state.pop(f"manual_digits_{idx}", None)
+    st.session_state[idx_state_key] = _next_qualifying_idx(qualifying_positions, idx, len(df))
+
+
+def _manual_ctrl_enter_shortcut(idx: int) -> None:
+    """Łączy Ctrl/Cmd+Enter z głównym przyciskiem bieżącego kroku Metody A."""
+    components.html(
+        f"""
+        <script>
+        const doc = window.parent.document;
+        const handlerKey = '__manualCtrlEnterHandler';
+        if (window.parent[handlerKey]) {{
+            doc.removeEventListener('keydown', window.parent[handlerKey], true);
+        }}
+        window.parent[handlerKey] = (event) => {{
+            if (!(event.ctrlKey || event.metaKey) || event.key !== 'Enter') return;
+            const directInput = doc.querySelector('input[placeholder="np. 2512"]');
+            const labels = directInput && directInput.value.trim()
+                ? ['Zapisz pełny kod i przejdź dalej']
+                : ['Zatwierdź kod finalny', 'Dalej →'];
+            const buttons = [...doc.querySelectorAll('button')];
+            const button = buttons.find((item) => labels.includes(item.innerText.trim()));
+            if (button && !button.disabled) {{
+                event.preventDefault();
+                button.click();
+            }}
+        }};
+        doc.addEventListener('keydown', window.parent[handlerKey], true);
+        </script>
+        """,
+        height=0,
+    )
+
+
 def render_manual_step(df, idx: int, row, df_state_key: str = "manual_df", idx_state_key: str = "manual_idx"):
     level = st.session_state.setdefault(f"manual_step_{idx}", 1)
     digits = st.session_state.setdefault(f"manual_digits_{idx}", [])
@@ -1238,6 +1315,36 @@ def render_manual_step(df, idx: int, row, df_state_key: str = "manual_df", idx_s
     n = len(df)
     qualifying_positions = _qualifying_positions(df, target)
 
+    st.markdown("**Lub wpisz od razu pełny, 4-cyfrowy kod ISCO-08:**")
+    direct_code = st.text_input(
+        "Pełny kod ISCO-08",
+        value="",
+        max_chars=4,
+        placeholder="np. 2512",
+        key=f"manual_direct_code_{idx}",
+        label_visibility="collapsed",
+    ).strip()
+    valid_final_codes = set(load_embeddings_level(4)[3])
+    if st.button(
+        "Zapisz pełny kod i przejdź dalej",
+        type="primary",
+        use_container_width=True,
+        key=f"manual_direct_save_{idx}",
+    ):
+        if not (len(direct_code) == 4 and direct_code.isdigit()):
+            st.warning("Wpisz 4 cyfry kodu ISCO-08.")
+        elif direct_code not in valid_final_codes:
+            st.warning("Podany kod nie występuje na liście kodów ISCO-08.")
+        else:
+            _manual_save_code(
+                df, idx, direct_code, target, uzasadnienie, df_state_key,
+                idx_state_key, qualifying_positions,
+            )
+            st.rerun()
+
+    st.caption("Skrót: Ctrl+Enter (na macOS także Cmd+Enter) uruchamia główny przycisk bieżącego kroku.")
+    _manual_ctrl_enter_shortcut(idx)
+
     col_back, col_next = st.columns(2)
     with col_back:
         if level > 1 and st.button("← Cofnij krok", use_container_width=True, key=f"manual_back_{idx}"):
@@ -1256,21 +1363,10 @@ def render_manual_step(df, idx: int, row, df_state_key: str = "manual_df", idx_s
             chosen_code = label_to_code[choice]
             if chosen_code == "__NO_MATCH__":
                 final_code = (prefix + "0" * (5 - level))[:4]
-                df.at[idx, "ISCO_poziom1"] = final_code[0]
-                df.at[idx, "ISCO_poziom2"] = final_code[1]
-                df.at[idx, "ISCO_poziom3"] = final_code[2]
-                df.at[idx, "ISCO_poziom4"] = final_code[3]
-                df.at[idx, "ISCO_PRED"] = final_code
-                df.at[idx, "ISCO_wybrany"] = final_code
-                df.at[idx, "Kodowany_podmiot"] = target
-                if uzasadnienie.strip():
-                    df.at[idx, "Uzasadnienie_finalne"] = uzasadnienie.strip()
-                    df.at[idx, "Decyzja_kodera_notatka"] = uzasadnienie.strip()
-                _save_respondent_meta(df, idx)
-                st.session_state[df_state_key] = df
-                st.session_state.pop(f"manual_step_{idx}", None)
-                st.session_state.pop(f"manual_digits_{idx}", None)
-                st.session_state[idx_state_key] = _next_qualifying_idx(qualifying_positions, idx, n)
+                _manual_save_code(
+                    df, idx, final_code, target, uzasadnienie, df_state_key,
+                    idx_state_key, qualifying_positions,
+                )
                 st.rerun()
             elif level < 4:
                 digits.append(chosen_code[-1])
@@ -1280,21 +1376,10 @@ def render_manual_step(df, idx: int, row, df_state_key: str = "manual_df", idx_s
                 st.rerun()
             else:
                 final_code = chosen_code
-                df.at[idx, "ISCO_poziom1"] = final_code[0]
-                df.at[idx, "ISCO_poziom2"] = final_code[1]
-                df.at[idx, "ISCO_poziom3"] = final_code[2]
-                df.at[idx, "ISCO_poziom4"] = final_code[3]
-                df.at[idx, "ISCO_PRED"] = final_code
-                df.at[idx, "ISCO_wybrany"] = final_code
-                df.at[idx, "Kodowany_podmiot"] = target
-                if uzasadnienie.strip():
-                    df.at[idx, "Uzasadnienie_finalne"] = uzasadnienie.strip()
-                    df.at[idx, "Decyzja_kodera_notatka"] = uzasadnienie.strip()
-                _save_respondent_meta(df, idx)
-                st.session_state[df_state_key] = df
-                st.session_state.pop(f"manual_step_{idx}", None)
-                st.session_state.pop(f"manual_digits_{idx}", None)
-                st.session_state[idx_state_key] = _next_qualifying_idx(qualifying_positions, idx, n)
+                _manual_save_code(
+                    df, idx, final_code, target, uzasadnienie, df_state_key,
+                    idx_state_key, qualifying_positions,
+                )
                 st.rerun()
 
 
@@ -1371,6 +1456,15 @@ def render_classify_manual():
 
     mode_suffix = "respondent" if mode_manual == "Respondent" else "partner"
 
+    # Pozwala wrócić do ostatnio zakodowanego przypadku również po ukończeniu
+    # całego pliku. Ponowny zapis po prostu nadpisuje poprzednią decyzję.
+    previous_manual_idx = _prev_qualifying_idx(qualifying_positions_manual, idx)
+    if previous_manual_idx != idx:
+        if st.button("← Wróć do poprzedniego przypadku", key=f"manual_prev_case_{idx}"):
+            _manual_reset_idx(previous_manual_idx)
+            st.session_state["manual_idx"] = previous_manual_idx
+            st.rerun()
+
     if idx < n:
         with st.expander(f"Pobierz częściowy wynik (dotychczasowy postęp: {progress_rank - 1} z {progress_total})"):
             partial_csv, partial_xlsx = _build_csv_xlsx_bytes(df)
@@ -1424,6 +1518,7 @@ def render_classify_manual():
     st.session_state.setdefault(f"manual_step_{idx}", 1)
     st.session_state.setdefault(f"manual_digits_{idx}", [])
 
+    _display_respondent_idno(row)
     st.write("Dane respondenta:")
     st.dataframe(
         visible_df_for_mode(df.iloc[[idx]], mode_manual),
@@ -1730,8 +1825,6 @@ def render_classify_hitl_1digit():
             st.error("W pliku brakuje wymaganych kolumn: " + ", ".join(missing))
             return
 
-        st.session_state["hitl_source_cols"] = df.select_dtypes(include="number").columns.tolist()
-
         # Kolejność kolumn dodawanych do wyniku jest ujednolicona z modułem 1
         # (Klasyfikacja zawodów z udziałem eksperta) - te same grupy w tej samej
         # kolejności. Dwie kolumny właściwe tylko dla tego modułu
@@ -1897,6 +1990,7 @@ def render_classify_hitl_1digit():
     st.session_state.setdefault(f"hitl_start_time_{idx}", time.time())
     st.session_state.setdefault(f"hitl_wracal_{idx}", False)
 
+    _display_respondent_idno(row)
     st.write("Dane respondenta:")
     st.caption("Kliknij nazwy kolumn (zmiennych), z których korzystasz przy klasyfikacji.")
 
@@ -1907,7 +2001,7 @@ def render_classify_hitl_1digit():
         column_config=build_column_config_for_respondent(row, load_var_metadata(mode_1d_row)),
         on_select="rerun",
         selection_mode=["multi-column"],
-        key=_resp_table_key(idx),
+        key=_resp_table_key(idx, "hitl1d_df"),
     )
 
     cols = _target_cols("hitl1d_df")
@@ -2114,12 +2208,13 @@ def render_cascade_step(df, idx: int, row, df_state_key: str = "hitl_df", idx_st
             chosen_code = candidates.iloc[choice_idx]["isco_code"]
             chosen_title = candidates.iloc[choice_idx]["title_pl"]
 
-        # Zmienne, z których korzystał koder = kolumny zaznaczone kliknięciem
-        # w tabeli "Dane respondenta" powyżej (współdzielony stan z tą tabelą),
-        # zawężone do zmiennych nietekstowych.
-        source_cols = st.session_state.get("hitl_source_cols", [])
+        # Zmienne, z których korzystał koder = dowolna kombinacja kolumn
+        # zaznaczonych w widocznej tabeli "Dane respondenta". Nie filtrujemy
+        # po dtype: kategorie ESS bywają wczytane jako tekst (np. B31), mimo
+        # że są pełnoprawnymi zmiennymi klasyfikacyjnymi.
+        source_cols = set(visible_df_for_mode(df.iloc[[idx]], target).columns)
         var_meta = load_var_metadata(target)
-        table_selection = st.session_state.get(_resp_table_key(idx), {})
+        table_selection = st.session_state.get(_resp_table_key(idx, df_state_key), {})
         clicked_cols = table_selection.get("selection", {}).get("columns", [])
         selected_vars = [c for c in clicked_cols if c in source_cols]
 
@@ -2292,7 +2387,7 @@ def _show_variable_dialog(col: str, raw_val, label: str, value_labels: dict):
                 st.markdown(f"{k} = {v}")
 
 
-def _resp_table_key(idx: int) -> str:
+def _resp_table_key(idx: int, df_state_key: str) -> str:
     """Klucz widgetu tabeli 'Dane respondenta' (st.dataframe z zaznaczaniem kolumn),
     zależny od aktualnego kroku kaskady (cascade_step_{idx}).
 
@@ -2303,7 +2398,9 @@ def _resp_table_key(idx: int) -> str:
     po stronie przeglądarki nawet po wyczyszczeniu session_state, dopóki klucz
     widgetu się nie zmienia."""
     level = st.session_state.get(f"cascade_step_{idx}", 0)
-    return f"resp_table_{idx}_lvl{level}"
+    # Namespace modułu zapobiega współdzieleniu stanu tabeli pomiędzy trybem
+    # 2 (hitl1d_df) i 3 (hitl_df) dla tego samego numeru respondenta/kroku.
+    return f"resp_table_{df_state_key}_{idx}_lvl{level}"
 
 
 def _handle_table_column_click(df, idx: int, row, var_meta: dict, selection_key: str):
@@ -2372,12 +2469,6 @@ def render_classify_hitl():
             if col not in df.columns:
                 st.error(f"W pliku nie znaleziono wymaganej kolumny: {col}")
                 return
-
-        # Zapamiętujemy oryginalne kolumny z pliku - to z nich koder będzie (opcjonalnie)
-        # wybierał, z których zmiennych tabelarycznych korzystał przy każdej decyzji
-        # kaskadowej. Tylko zmienne NIEtekstowe (numeryczne) - B33/B34/B35 i B48/B49/B50
-        # to wolny tekst używany bezpośrednio do embeddingu, więc nie mają tu sensu.
-        st.session_state["hitl_source_cols"] = df.select_dtypes(include="number").columns.tolist()
 
         if "ISCO_wybrany" not in df.columns:
             df["ISCO_wybrany"] = None
@@ -2577,6 +2668,7 @@ def render_classify_hitl():
     st.session_state.setdefault(f"hitl_start_time_{idx}", time.time())
     st.session_state.setdefault(f"hitl_wracal_{idx}", False)
 
+    _display_respondent_idno(row)
     st.write("Dane respondenta:")
     st.caption("Kliknij nazwy kolumn (zmiennych), z których korzystasz przy klasyfikacji.")
 
@@ -2588,7 +2680,7 @@ def render_classify_hitl():
         column_config=build_column_config_for_respondent(row, _var_meta_debug),
         on_select="rerun",
         selection_mode=["multi-column"],
-        key=_resp_table_key(idx),
+        key=_resp_table_key(idx, "hitl_df"),
     )
 
     cols = _target_cols("hitl_df")
