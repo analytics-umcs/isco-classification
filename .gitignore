@@ -15,6 +15,10 @@ venv/
 # Local scratch/export folders.
 /tmp/
 /exports/
+/data/
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
 
 # Read-only local source copies; do not deploy or edit.
 /ORIGINAL_FILES_Do_NOT_TOUCH/

@@ -3,7 +3,11 @@ import csv
 import hmac
 import io
 import json
+import os
+import sqlite3
 import time
+from contextlib import closing
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -70,6 +74,10 @@ APP_USERS = {
     "User9": "qlFhOlqR",
     "User10": "FefEeumO",
 }
+ADMIN_USERS = {"User1"}
+QUESTIONNAIRE_DB_PATH = Path(
+    os.environ.get("QUESTIONNAIRE_DB_PATH", APP_DIR / "data" / "questionnaire.sqlite3")
+)
 
 ASSET_DIR = APP_DIR / "assets"
 LOGO_PATHS = {
@@ -1283,6 +1291,108 @@ def _questionnaire_csv() -> bytes:
     return output.getvalue().encode("utf-8-sig")
 
 
+def _questionnaire_answers() -> dict:
+    return {
+        f"{section['id']}{number}": st.session_state.get(
+            f"questionnaire_{section['id']}_{number}"
+        )
+        for section in QUESTIONNAIRE_SECTIONS
+        for number in range(1, len(section["questions"]) + 1)
+    }
+
+
+def _questionnaire_db() -> sqlite3.Connection:
+    QUESTIONNAIRE_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    connection = sqlite3.connect(QUESTIONNAIRE_DB_PATH, timeout=30)
+    connection.execute("PRAGMA journal_mode=WAL")
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS questionnaire_responses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            submitted_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            submitted_by TEXT NOT NULL,
+            participant_code TEXT NOT NULL,
+            survey_date TEXT,
+            age INTEGER,
+            gender TEXT,
+            answers_json TEXT NOT NULL
+        )
+        """
+    )
+    return connection
+
+
+def _save_questionnaire_response() -> int:
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    survey_date = st.session_state.get("questionnaire_date")
+    values = (
+        now,
+        st.session_state.get("username", ""),
+        st.session_state.get("questionnaire_participant_code", "").strip(),
+        survey_date.isoformat() if survey_date else None,
+        st.session_state.get("questionnaire_age"),
+        st.session_state.get("questionnaire_gender", "").strip(),
+        json.dumps(_questionnaire_answers(), ensure_ascii=False),
+    )
+    response_id = st.session_state.get("questionnaire_response_id")
+    with closing(_questionnaire_db()) as connection, connection:
+        if response_id is None:
+            cursor = connection.execute(
+                """
+                INSERT INTO questionnaire_responses
+                    (submitted_at, updated_at, submitted_by, participant_code,
+                     survey_date, age, gender, answers_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (now,) + values,
+            )
+            response_id = int(cursor.lastrowid)
+        else:
+            connection.execute(
+                """
+                UPDATE questionnaire_responses
+                SET updated_at = ?, submitted_by = ?, participant_code = ?,
+                    survey_date = ?, age = ?, gender = ?, answers_json = ?
+                WHERE id = ?
+                """,
+                values + (response_id,),
+            )
+    st.session_state.questionnaire_response_id = response_id
+    return response_id
+
+
+def _questionnaire_results_df() -> pd.DataFrame:
+    with closing(_questionnaire_db()) as connection:
+        rows = connection.execute(
+            """
+            SELECT id, submitted_at, updated_at, submitted_by, participant_code,
+                   survey_date, age, gender, answers_json
+            FROM questionnaire_responses
+            ORDER BY id DESC
+            """
+        ).fetchall()
+    columns = [
+        "id", "submitted_at", "updated_at", "submitted_by", "participant_code",
+        "survey_date", "age", "gender", "answers_json",
+    ]
+    records = []
+    for row in rows:
+        record = dict(zip(columns, row))
+        answers = json.loads(record.pop("answers_json"))
+        record.update(answers)
+        records.append(record)
+    answer_columns = [
+        f"{section['id']}{number}"
+        for section in QUESTIONNAIRE_SECTIONS
+        for number in range(1, len(section["questions"]) + 1)
+    ]
+    return pd.DataFrame(
+        records,
+        columns=columns[:-1] + answer_columns,
+    )
+
+
 def _set_questionnaire_answer(key: str, value: int) -> None:
     st.session_state[key] = value
 
@@ -1382,14 +1492,51 @@ def render_questionnaire():
         elif missing:
             st.error(f"Odpowiedz na wszystkie pytania. Brakujące pozycje: {', '.join(missing)}.")
         else:
-            st.session_state.questionnaire_completed = True
-            st.success("Kwestionariusz został uzupełniony. Nadal możesz zmieniać odpowiedzi i wysłać go ponownie.")
+            try:
+                response_id = _save_questionnaire_response()
+            except sqlite3.Error:
+                st.error("Nie udało się zapisać odpowiedzi. Spróbuj ponownie lub skontaktuj się z administratorem.")
+            else:
+                st.session_state.questionnaire_completed = True
+                st.success(
+                    f"Odpowiedzi zapisano trwale (rekord nr {response_id}). "
+                    "Nadal możesz je zmienić i wysłać ponownie."
+                )
 
     if st.session_state.get("questionnaire_completed"):
         st.download_button(
             "Pobierz odpowiedzi (CSV)", data=_questionnaire_csv(),
             file_name="odpowiedzi_kwestionariusz.csv", mime="text/csv", use_container_width=True,
         )
+
+
+def render_questionnaire_results():
+    if st.session_state.get("username") not in ADMIN_USERS:
+        st.error("Brak uprawnień do wyników ankiet.")
+        return
+
+    st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+    st.markdown('<div class="top-bar"></div>', unsafe_allow_html=True)
+    render_logo_header()
+    if st.button("← Wróć do strony głównej", key="back_questionnaire_results"):
+        go_to("home")
+        st.rerun()
+
+    st.title("Wyniki ankiet")
+    results = _questionnaire_results_df()
+    st.metric("Liczba zapisanych ankiet", len(results))
+    if results.empty:
+        st.info("Nie zapisano jeszcze żadnej ankiety.")
+        return
+
+    st.dataframe(results, use_container_width=True, hide_index=True)
+    st.download_button(
+        "Pobierz wszystkie wyniki (CSV)",
+        data=results.to_csv(index=False).encode("utf-8-sig"),
+        file_name="wszystkie_wyniki_ankiet.csv",
+        mime="text/csv",
+        use_container_width=True,
+    )
 
 
 # ============================================================
@@ -3135,6 +3282,10 @@ with st.sidebar:
     if st.button("Kwestionariusz badawczy", type="primary", use_container_width=True, key="sidebar_questionnaire"):
         go_to("questionnaire")
         st.rerun()
+    if st.session_state.get("username") in ADMIN_USERS:
+        if st.button("Wyniki ankiet", use_container_width=True, key="sidebar_questionnaire_results"):
+            go_to("questionnaire_results")
+            st.rerun()
     if st.button("Wyloguj", use_container_width=True):
         for key in ("authenticated", "username"):
             st.session_state.pop(key, None)
@@ -3151,3 +3302,5 @@ elif st.session_state.page == "classify_hitl_1digit":
     render_classify_hitl_1digit()
 elif st.session_state.page == "questionnaire":
     render_questionnaire()
+elif st.session_state.page == "questionnaire_results":
+    render_questionnaire_results()
