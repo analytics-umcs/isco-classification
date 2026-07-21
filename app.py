@@ -1,4 +1,5 @@
 import base64
+import csv
 import hmac
 import io
 import json
@@ -81,6 +82,101 @@ LOGO_PATHS = {
 # Kolory identyfikacji wizualnej
 COLOR_ISCO = "#003B73"  # granat
 COLOR_ESS = "#C1121F"   # czerwony
+
+QUESTIONNAIRE_SECTIONS = [
+    {
+        "id": "A",
+        "title": "Stwierdzenia dotyczące codziennych sytuacji",
+        "instruction": "Określ, w jakim stopniu zgadzasz się z każdym stwierdzeniem.",
+        "options": {
+            1: "Zdecydowanie się nie zgadzam", 2: "Nie zgadzam się",
+            3: "Raczej się nie zgadzam", 4: "Raczej się zgadzam",
+            5: "Zgadzam się", 6: "Zdecydowanie się zgadzam",
+        },
+        "questions": [
+            "Zwykle biorę pod uwagę różne opinie na temat danego zjawiska, nawet wówczas, gdy mam już wyrobiony pogląd.",
+            "Unikam niejasnych sytuacji.",
+            "Myślę, że dobrze uporządkowane życie jest zgodne z moim temperamentem.",
+            "Czuję się źle, kiedy nie rozumiem powodów, dla których pewne sytuacje zdarzają się w moim życiu.",
+            "Unikam brania udziału w wydarzeniach, nie wiedząc, czego mogę się po nich spodziewać.",
+            "Zwykle podejmuję ważne decyzje szybko i pewnie.",
+            "Mógłbym opisać siebie jako osobę niezdecydowaną.",
+            "Podejmując większość ważnych decyzji, borykam się z mnóstwem sprzeczności.",
+            "Przyglądając się większości sytuacji konfliktowych, potrafię zwykle dostrzec racje obu stron.",
+            "Unikam przebywania wśród ludzi, którzy są zdolni do nieoczekiwanych działań.",
+            "Dopiero ustalenie spójnych reguł umożliwia mi cieszenie się życiem.",
+            "Cenię sobie zorganizowany styl życia.",
+            "Czuję dyskomfort, gdy czyjeś czyny lub intencje są dla mnie niejasne.",
+            "Zwykle dostrzegam wiele możliwych rozwiązań problemu, przed którym stoję.",
+            "Unikam sytuacji, których konsekwencji nie da się przewidzieć.",
+        ],
+    },
+    {
+        "id": "B", "title": "Sposoby działania i myślenia",
+        "instruction": "Określ, jak często myślisz lub działasz w opisany sposób.",
+        "options": {1: "Rzadko / nigdy", 2: "Czasami", 3: "Często", 4: "Prawie zawsze / zawsze"},
+        "questions": [
+            "Starannie planuję wykonywane zadania.", "Działam bez namysłu.",
+            "Trudno mi skupić uwagę.", "Jestem opanowany/a.", "Łatwo się koncentruję.",
+            "Jestem rozważny/a.", "Mówię rzeczy bez namysłu.", "Działam pod wpływem chwili.",
+        ],
+    },
+    {
+        "id": "C", "title": "Opis siebie",
+        "instruction": "Oceń, w jakim stopniu każde określenie odnosi się do Ciebie.",
+        "options": {
+            1: "Zdecydowanie się nie zgadzam", 2: "Raczej się nie zgadzam",
+            3: "W niewielkim stopniu się nie zgadzam", 4: "Ani się zgadzam, ani nie zgadzam",
+            5: "W niewielkim stopniu się zgadzam", 6: "Raczej się zgadzam",
+            7: "Zdecydowanie się zgadzam",
+        },
+        "questions": [
+            "Postrzegam siebie jako osobę lubiącą towarzystwo innych, aktywną i optymistyczną.",
+            "Postrzegam siebie jako osobę krytyczną względem innych, konfliktową.",
+            "Postrzegam siebie jako osobę sumienną, zdyscyplinowaną.",
+            "Postrzegam siebie jako osobę pełną niepokoju, łatwo wpadającą w przygnębienie.",
+            "Postrzegam siebie jako osobę otwartą na nowe doznania, w złożony sposób postrzegającą świat.",
+            "Postrzegam siebie jako osobę zamkniętą w sobie, wycofaną i cichą.",
+            "Postrzegam siebie jako osobę zgodną, życzliwą.",
+            "Postrzegam siebie jako osobę źle zorganizowaną, niedbałą.",
+            "Postrzegam siebie jako osobę niemartwiącą się, stabilną emocjonalnie.",
+            "Postrzegam siebie jako osobę trzymającą się utartych schematów, biorącą rzeczy wprost.",
+        ],
+    },
+    {
+        "id": "D", "title": "Przetwarzanie bodźców i doświadczeń",
+        "instruction": "Odpowiedz zgodnie z tym, jak się czujesz (1 — zupełnie nie, 4 — umiarkowanie, 7 — zdecydowanie tak).",
+        "options": {1: "Zupełnie nie", 2: "2", 3: "3", 4: "Umiarkowanie", 5: "5", 6: "6", 7: "Zdecydowanie tak"},
+        "questions": [
+            "Czy masz bogate, złożone życie wewnętrzne?", "Czy drażnią Cię głośne dźwięki?",
+            "Czy głęboko przeżywasz sztukę lub muzykę?",
+            "Czy denerwujesz się, kiedy musisz zrobić dużo rzeczy jednocześnie?",
+            "Czy drażni Cię, kiedy inni chcą od Ciebie zbyt wielu rzeczy naraz?",
+            "Czy zmiany w Twoim życiu dezorganizują Cię?",
+            "Czy zwracasz uwagę na delikatne lub piękne zapachy, smaki, dźwięki albo dzieła sztuki i cieszysz się nimi?",
+            "Czy źle się czujesz, gdy trzeba robić wiele rzeczy jednocześnie?",
+            "Czy przeszkadzają Ci intensywne bodźce, np. głośne dźwięki lub chaos?",
+            "Czy stajesz się nerwowy/a i niepewny/a, a w efekcie osiągasz gorsze wyniki, gdy ktoś obserwuje Cię podczas rywalizacji lub wykonywania zadania?",
+        ],
+    },
+    {
+        "id": "E", "title": "Myśli i odczucia związane ze stresem",
+        "instruction": "Wskaż, jak często w ostatnim miesiącu myślałeś/aś lub czułeś/aś się w opisany sposób.",
+        "options": {1: "Nigdy", 2: "Prawie nigdy", 3: "Czasem", 4: "Dość często", 5: "Bardzo często"},
+        "questions": [
+            "Jak często w ciągu ostatniego miesiąca byłeś/aś zdenerwowany/a, ponieważ zdarzyło się coś niespodziewanego?",
+            "Jak często w ciągu ostatniego miesiąca czułeś/aś, że ważne sprawy w Twoim życiu wymykają Ci się spod kontroli?",
+            "Jak często w ciągu ostatniego miesiąca odczuwałeś/aś zdenerwowanie i napięcie?",
+            "Jak często w ciągu ostatniego miesiąca byłeś/aś przekonany/a, że jesteś w stanie poradzić sobie z problemami osobistymi?",
+            "Jak często w ciągu ostatniego miesiąca czułeś/aś, że sprawy układają się po Twojej myśli?",
+            "Jak często w ciągu ostatniego miesiąca stwierdzałeś/aś, że nie radzisz sobie ze wszystkimi obowiązkami?",
+            "Jak często w ciągu ostatniego miesiąca potrafiłeś/aś opanować swoje rozdrażnienie?",
+            "Jak często w ciągu ostatniego miesiąca czułeś/aś, że wszystko Ci wychodzi?",
+            "Jak często w ciągu ostatniego miesiąca złościłeś/aś się, ponieważ nie miałeś/aś wpływu na to, co się zdarzyło?",
+            "Jak często w ciągu ostatniego miesiąca czułeś/aś, że nie możesz przezwyciężyć narastających trudności?",
+        ],
+    },
+]
 
 CUSTOM_CSS = f"""
 <style>
@@ -195,6 +291,77 @@ div[class*="st-key-pa_top10_ai_helpfulness_"][class*="_spread"] div[role="radiog
 div[class*="st-key-hitl_ai_helpfulness_"][class*="_spread"] div[role="radiogroup"] label {{
     flex: 1 1 0;
     justify-content: center;
+}}
+div[class*="st-key-questionnaire_"] div[role="radiogroup"] {{
+    width: 100%;
+    display: flex;
+    justify-content: space-around;
+    gap: 0.15rem;
+}}
+div[class*="st-key-questionnaire_"] div[role="radiogroup"] label {{
+    flex: 1 1 0;
+    justify-content: center;
+    min-width: 0;
+    padding: 0.25rem 0.1rem;
+}}
+div[class*="st-key-questionnaire_"] div[role="radiogroup"] label p {{
+    display: none;
+}}
+div[class*="st-key-questionnaire_"] div[role="radiogroup"] label > div:first-child {{
+    margin: 0 auto;
+}}
+div[class*="st-key-questionnaire_choice_"] button {{
+    min-height: 2.5rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    color: #475569;
+    font-size: 1.55rem;
+    line-height: 1;
+}}
+div[class*="st-key-questionnaire_choice_"] button:hover {{
+    border: 0;
+    background: #eef3f8;
+    color: #003B73;
+}}
+div[class*="st-key-questionnaire_choice_"] button:focus {{
+    box-shadow: 0 0 0 2px rgba(0, 59, 115, 0.25);
+}}
+div[class*="st-key-questionnaire_table_"] div[data-testid="stColumn"] {{
+    border-right: 1px solid #d7dee8;
+}}
+div[class*="st-key-questionnaire_table_"] div[data-testid="stColumn"]:last-child {{
+    border-right: 0;
+}}
+.questionnaire-table-head {{
+    min-height: 6.5rem;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    color: #334155;
+    padding: 0.45rem 0.25rem;
+    text-align: center;
+    font-size: 0.78rem;
+    line-height: 1.2;
+    background: #eef3f8;
+    border-bottom: 2px solid #94a3b8;
+    margin-bottom: 0.15rem;
+}}
+.questionnaire-table-head--question {{
+    align-items: flex-start;
+    padding-left: 0.65rem;
+    font-size: 0.92rem;
+}}
+.questionnaire-table-head__number {{
+    display: block;
+    color: #003B73;
+    font-size: 1.05rem;
+    font-weight: 800;
+    margin-bottom: 0.25rem;
 }}
 @media (max-width: 700px) {{
     .logo-header {{
@@ -1100,6 +1267,131 @@ def go_to(page_name: str):
     st.session_state.page = page_name
 
 
+def _questionnaire_csv() -> bytes:
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["kod_uczestnika", st.session_state.get("questionnaire_participant_code", "")])
+    writer.writerow(["data", st.session_state.get("questionnaire_date", "")])
+    writer.writerow(["wiek", st.session_state.get("questionnaire_age", "")])
+    writer.writerow(["plec", st.session_state.get("questionnaire_gender", "")])
+    writer.writerow([])
+    writer.writerow(["czesc", "numer", "pytanie", "odpowiedz", "etykieta"])
+    for section in QUESTIONNAIRE_SECTIONS:
+        for number, question in enumerate(section["questions"], 1):
+            answer = st.session_state.get(f"questionnaire_{section['id']}_{number}")
+            writer.writerow([section["id"], number, question, answer, section["options"].get(answer, "")])
+    return output.getvalue().encode("utf-8-sig")
+
+
+def _set_questionnaire_answer(key: str, value: int) -> None:
+    st.session_state[key] = value
+
+
+def render_questionnaire():
+    st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+    st.markdown('<div class="top-bar"></div>', unsafe_allow_html=True)
+    render_logo_header()
+    if st.button("← Wróć do strony głównej", key="back_questionnaire"):
+        go_to("home")
+        st.rerun()
+
+    st.title("Kwestionariusz badawczy")
+    st.caption("Pakiet pytań dotyczących sposobu myślenia, działania i opisu siebie")
+    st.info(
+        "Nie ma odpowiedzi dobrych ani złych. Odpowiadaj samodzielnie i szczerze. "
+        "Przy każdym pytaniu wybierz dokładnie jedną odpowiedź; możesz ją później zmienić."
+    )
+
+    with st.container(border=True):
+        col1, col2 = st.columns(2)
+        with col1:
+            st.text_input("Kod uczestnika", key="questionnaire_participant_code")
+            st.number_input("Wiek", min_value=0, max_value=120, value=None, step=1, key="questionnaire_age")
+        with col2:
+            st.date_input("Data", value=None, key="questionnaire_date")
+            st.text_input("Płeć (opcjonalnie)", key="questionnaire_gender")
+
+    # Usuń wartości niepasujące do aktualnych skal (np. stare 0 w części E).
+    for section in QUESTIONNAIRE_SECTIONS:
+        for number in range(1, len(section["questions"]) + 1):
+            key = f"questionnaire_{section['id']}_{number}"
+            if key in st.session_state and st.session_state[key] not in section["options"]:
+                del st.session_state[key]
+
+    total = sum(len(section["questions"]) for section in QUESTIONNAIRE_SECTIONS)
+    answered = sum(
+        st.session_state.get(f"questionnaire_{section['id']}_{number}") is not None
+        for section in QUESTIONNAIRE_SECTIONS
+        for number in range(1, len(section["questions"]) + 1)
+    )
+    st.progress(answered / total, text=f"Udzielono odpowiedzi: {answered} z {total}")
+
+    for section in QUESTIONNAIRE_SECTIONS:
+        st.header(f"Część {section['id']}")
+        st.subheader(section["title"])
+        st.write(section["instruction"])
+        with st.container(border=True, key=f"questionnaire_table_{section['id']}"):
+            option_values = list(section["options"])
+            header_columns = st.columns([5] + [1] * len(option_values), gap="small")
+            with header_columns[0]:
+                st.markdown(
+                    '<div class="questionnaire-table-head questionnaire-table-head--question">Pytanie</div>',
+                    unsafe_allow_html=True,
+                )
+            for column, value in zip(header_columns[1:], option_values):
+                with column:
+                    option_label = section["options"][value]
+                    description = "" if option_label.strip() == str(value) else option_label
+                    st.markdown(
+                        '<div class="questionnaire-table-head">'
+                        f'<span class="questionnaire-table-head__number">{value}</span>'
+                        f'{description}</div>',
+                        unsafe_allow_html=True,
+                    )
+
+            for number, question in enumerate(section["questions"], 1):
+                answer_key = f"questionnaire_{section['id']}_{number}"
+                row_columns = st.columns(
+                    [5] + [1] * len(option_values), vertical_alignment="center", gap="small"
+                )
+                with row_columns[0]:
+                    st.markdown(f"**{number}.** {question}")
+                selected_value = st.session_state.get(answer_key)
+                for column, value in zip(row_columns[1:], option_values):
+                    with column:
+                        st.button(
+                            "●" if selected_value == value else "○",
+                            key=f"questionnaire_choice_{section['id']}_{number}_{value}",
+                            help=f"Wybierz odpowiedź {value}: {section['options'][value]}",
+                            on_click=_set_questionnaire_answer,
+                            args=(answer_key, value),
+                            use_container_width=True,
+                        )
+                st.divider()
+        st.write("")
+
+    st.caption("Przed wysłaniem możesz wrócić do dowolnej części i zmienić każdą odpowiedź.")
+    if st.button("Wyślij kwestionariusz", type="primary", use_container_width=True):
+        missing = []
+        for section in QUESTIONNAIRE_SECTIONS:
+            for number in range(1, len(section["questions"]) + 1):
+                if st.session_state.get(f"questionnaire_{section['id']}_{number}") is None:
+                    missing.append(f"{section['id']}{number}")
+        if not st.session_state.get("questionnaire_participant_code", "").strip():
+            st.error("Wpisz kod uczestnika.")
+        elif missing:
+            st.error(f"Odpowiedz na wszystkie pytania. Brakujące pozycje: {', '.join(missing)}.")
+        else:
+            st.session_state.questionnaire_completed = True
+            st.success("Kwestionariusz został uzupełniony. Nadal możesz zmieniać odpowiedzi i wysłać go ponownie.")
+
+    if st.session_state.get("questionnaire_completed"):
+        st.download_button(
+            "Pobierz odpowiedzi (CSV)", data=_questionnaire_csv(),
+            file_name="odpowiedzi_kwestionariusz.csv", mime="text/csv", use_container_width=True,
+        )
+
+
 # ============================================================
 # STRONA GŁÓWNA
 # ============================================================
@@ -1117,6 +1409,10 @@ def render_home():
         """,
         unsafe_allow_html=True,
     )
+
+    if st.button("Przejdź do kwestionariusza badawczego", type="primary", use_container_width=True):
+        go_to("questionnaire")
+        st.rerun()
 
     st.write(
         "Aplikacja umożliwia klasyfikację zawodów zgodnie ze standardem ISCO-08 "
@@ -2836,6 +3132,9 @@ require_login()
 
 with st.sidebar:
     st.caption(f"Zalogowano: {st.session_state.get('username', '')}")
+    if st.button("Kwestionariusz badawczy", type="primary", use_container_width=True, key="sidebar_questionnaire"):
+        go_to("questionnaire")
+        st.rerun()
     if st.button("Wyloguj", use_container_width=True):
         for key in ("authenticated", "username"):
             st.session_state.pop(key, None)
@@ -2850,3 +3149,5 @@ elif st.session_state.page == "classify_hitl":
     render_classify_hitl()
 elif st.session_state.page == "classify_hitl_1digit":
     render_classify_hitl_1digit()
+elif st.session_state.page == "questionnaire":
+    render_questionnaire()
