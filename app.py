@@ -1419,7 +1419,7 @@ def render_questionnaire():
             st.number_input("Wiek", min_value=0, max_value=120, value=None, step=1, key="questionnaire_age")
         with col2:
             st.date_input("Data", value=None, key="questionnaire_date")
-            st.text_input("Płeć (opcjonalnie)", key="questionnaire_gender")
+            st.text_input("Płeć", key="questionnaire_gender")
 
     # Usuń wartości niepasujące do aktualnych skal (np. stare 0 w części E).
     for section in QUESTIONNAIRE_SECTIONS:
