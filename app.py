@@ -625,6 +625,15 @@ def visible_df_for_mode(df: pd.DataFrame, target: str) -> pd.DataFrame:
     tylko by się powtarzały."""
     allowed = _mode_var_names(target) - set(TARGET_COLUMNS[target].values())
     keep_cols = [c for c in df.columns if c in allowed]
+
+    # ID respondenta zawsze widoczne w tabeli jako pierwsza kolumna, niezależnie
+    # od whitelisty trybu (idno nie jest zmienną z pliku metadanych, więc bez
+    # tego byłoby ukryte - a koderzy chcą je widzieć wprost w tabelce, nie
+    # tylko w komunikacie nad nią).
+    idno_col = next((c for c in df.columns if str(c).strip().lower() == "idno"), None)
+    if idno_col is not None and idno_col not in keep_cols:
+        keep_cols = [idno_col] + keep_cols
+
     return df[keep_cols]
 
 
@@ -1254,7 +1263,7 @@ def batch_classify_dataframe(
 
 def read_csv_robust(uploaded_file) -> pd.DataFrame:
     """Wczytuje CSV z autodetekcją separatora i kodowania."""
-    for encoding in ("utf-8", "utf-8-sig", "cp1250", "latin1"):
+    for encoding in ("utf-8-sig", "utf-8", "cp1250", "latin1"):
         try:
             uploaded_file.seek(0)
             return pd.read_csv(uploaded_file, sep=None, engine="python", encoding=encoding)
