@@ -4,12 +4,14 @@ import hmac
 import io
 import json
 import os
+import re
 import sqlite3
 import time
 from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Tuple
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
@@ -74,10 +76,32 @@ APP_USERS = {
     "User9": "qlFhOlqR",
     "User10": "FefEeumO",
 }
-ADMIN_USERS = {"User1"}
+ADMIN_USERS = {"User1", "User2"}
 QUESTIONNAIRE_DB_PATH = Path(
     os.environ.get("QUESTIONNAIRE_DB_PATH", APP_DIR / "data" / "questionnaire.sqlite3")
 )
+CODING_DB_PATH = Path(
+    os.environ.get("CODING_DB_PATH", APP_DIR / "data" / "coding_progress.sqlite3")
+)
+
+# Mapowanie klucza stanu sesji (df_state_key) na etykietę wariantu metodologicznego
+# używaną w ewidencji postępu kodowania i w pliku przydziału (Status.csv).
+# manual_df = Metoda A (kodowanie ręczne), hitl_df = Metoda B (klasyfikacja
+# z udziałem eksperta, pełna kaskada), hitl1d_df = Metoda C (1 cyfra przyporządkowana).
+DF_STATE_KEY_TO_WARIANT = {
+    "manual_df": "Ręczne",
+    "hitl_df": "AI",
+    "hitl1d_df": "AI (1 cyfra)",
+}
+
+WARSAW_TZ = ZoneInfo("Europe/Warsaw")
+
+
+def _now_pl() -> str:
+    """Aktualny czas w polskiej strefie (uwzględnia czas letni/zimowy automatycznie),
+    w czytelnym formacie DD.MM.RRRR GG:MM - używane we wszystkich znacznikach czasu
+    zapisywanych przez aplikację (ewidencja kodowania, kwestionariusz badawczy)."""
+    return datetime.now(WARSAW_TZ).strftime("%d.%m.%Y %H:%M")
 
 ASSET_DIR = APP_DIR / "assets"
 LOGO_PATHS = {
@@ -1335,7 +1359,7 @@ def _questionnaire_db() -> sqlite3.Connection:
 
 
 def _save_questionnaire_response() -> int:
-    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    now = _now_pl()
     survey_date = st.session_state.get("questionnaire_date")
     values = (
         now,
@@ -1551,6 +1575,492 @@ def render_questionnaire_results():
 
 
 # ============================================================
+# EWIDENCJA POSTĘPU KODOWANIA (przydział z Status.csv + zapisy na bieżąco)
+# ============================================================
+WARIANT_LETTER_TO_LABEL = {"A": "Ręczne", "B": "AI", "C": "AI (1 cyfra)"}
+
+# Normalizacja aliasów kodera używanych w pliku Status.csv (różne w Lipcu
+# i Sierpniu) do jednolitej postaci koder_1 / koder_2 / koder_3, niezależnie
+# od miesiąca - tak, żeby w ewidencji nie pojawiały się imiona.
+KODER_ALIAS_TO_NORMALIZED = {
+    "Jan": "koder_1",
+    "Marta": "koder_2",
+    "Piotr": "koder_3",
+    "Koder_1": "koder_1",
+    "Koder_2": "koder_2",
+    "Koder_3": "koder_3",
+}
+
+_PACZKA_RE = re.compile(r"^(?P<miesiac>[^_]+)_(?P<koder>.+)_(?P<wariant>[ABC])$")
+
+# Pełna lista kolumn "wynikowych" (kody, uzasadnienia, czasy, oceny AI) zbieranych
+# do szczegółowego logu kodowania (coding_details) - patrz _record_coding_details.
+# Świadomie NIE obejmuje surowych zmiennych ankietowych (B31, B33...) respondenta.
+CODING_DETAIL_COLUMNS = [
+    "ISCO_wybrany", "ISCO_PRED",
+    "ISCO_poziom1", "ISCO_poziom2", "ISCO_poziom3", "ISCO_poziom4",
+    "ISCO_poziom1_zmienne", "ISCO_poziom2_zmienne", "ISCO_poziom3_zmienne", "ISCO_poziom4_zmienne",
+    "ISCO_poziom1_ranking_pozycja", "ISCO_poziom2_ranking_pozycja",
+    "ISCO_poziom3_ranking_pozycja", "ISCO_poziom4_ranking_pozycja",
+    "ISCO_poziom1_score", "ISCO_poziom2_score", "ISCO_poziom3_score", "ISCO_poziom4_score",
+    "Decyzja_kodera_zawod", "Decyzja_kodera_notatka",
+    "Brak_mozliwosci_zakodowania", "Uzasadnienie_finalne",
+    "Ranking_pozycja_wybranego_kodu", "Score_wybranego_kodu",
+    "Ocena_AI_top10_1_5", "Ocena_AI_kaskadowo_1_5",
+    "Cyfra1_zatwierdzona_expert", "Powod_odrzucenia_cyfry",
+    "Czas_kodowania_sekundy", "Czas_do_pierwszej_interakcji_sekundy", "Czy_uzytkownik_wracal",
+]
+
+
+def _parse_paczka(paczka: str) -> Optional[dict]:
+    """Rozbija wartość kolumny 'paczka' z pliku Status.csv na miesiąc, znormalizowanego
+    kodera (koder_1/2/3, niezależnie od tego czy w pliku były imiona czy 'Koder_N')
+    i etykietę wariantu (Ręczne/AI/AI (1 cyfra)). Zwraca None dla 'Trening' (osobna
+    pula kalibracyjna, bez przypisanego 1:1 kodera/wariantu w tym pliku) i dla
+    nierozpoznanego formatu. 'Brak' jest obsługiwane osobno przez wywołującego
+    (patrz _import_case_assignments) - trafia do case_unassigned, nie tutaj."""
+    paczka = (paczka or "").strip()
+    if paczka in ("Brak", "Trening", ""):
+        return None
+    match = _PACZKA_RE.match(paczka)
+    if not match:
+        return None
+    miesiac = match.group("miesiac")
+    koder_raw = match.group("koder")
+    wariant_letter = match.group("wariant")
+    return {
+        "miesiac": miesiac,
+        "koder_przydzielony": KODER_ALIAS_TO_NORMALIZED.get(koder_raw, koder_raw),
+        "wariant": WARIANT_LETTER_TO_LABEL.get(wariant_letter, wariant_letter),
+    }
+
+
+def _coding_db() -> sqlite3.Connection:
+    CODING_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    connection = sqlite3.connect(CODING_DB_PATH, timeout=30)
+    connection.execute("PRAGMA journal_mode=WAL")
+    # Przydział (kto ma zakodować co, jakim wariantem) - wgrywany RAZ przez admina
+    # i trwale przechowywany na serwerze (patrz render_ewidencja) - kolejne wejścia
+    # na stronę NIE wymagają ponownego wgrywania, chyba że admin świadomie podmieni plik.
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS case_assignments (
+            idno TEXT NOT NULL,
+            osoba TEXT NOT NULL,
+            miesiac TEXT NOT NULL,
+            koder_przydzielony TEXT NOT NULL,
+            wariant TEXT NOT NULL,
+            PRIMARY KEY (idno, osoba, wariant)
+        )
+        """
+    )
+    # Przypadki oznaczone w Status.csv jako 'Brak' (nieprzydzielone do nikogo) -
+    # trzymane osobno, żeby nie zaśmiecały głównej ewidencji (patrz druga zakładka).
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS case_unassigned (
+            idno TEXT NOT NULL,
+            osoba TEXT NOT NULL,
+            PRIMARY KEY (idno, osoba)
+        )
+        """
+    )
+    # Metadane ostatniego importu przydziału - jeden wiersz (id=1), pokazywany w UI,
+    # żeby było jasne, że plik jest wgrywany raz, a nie za każdym razem od nowa.
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS case_assignments_meta (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            imported_at TEXT NOT NULL,
+            imported_by TEXT NOT NULL,
+            assigned_rows INTEGER NOT NULL,
+            unassigned_rows INTEGER NOT NULL
+        )
+        """
+    )
+    # Status "zrobione/nie" per (idno, osoba, wariant) - nadpisywany przy ponownym
+    # zakodowaniu tego samego przypadku (patrz _record_coding_event).
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS coding_events (
+            idno TEXT NOT NULL,
+            osoba TEXT NOT NULL,
+            wariant TEXT NOT NULL,
+            koder TEXT NOT NULL,
+            isco_kod TEXT,
+            zapisano_o TEXT NOT NULL,
+            PRIMARY KEY (idno, osoba, wariant)
+        )
+        """
+    )
+    # Pełny, dopisywany (append-only) log przebiegu kodowania - osobna tabela,
+    # NIE łączona z bazową ramką ewidencji (coding_events / _ewidencja_df).
+    # Każdy zapis decyzji dodaje nowy wiersz (historia, nie nadpisywanie), żeby
+    # było widać też ewentualne poprawki/ponowne kodowanie tego samego przypadku.
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS coding_details (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            idno TEXT NOT NULL,
+            osoba TEXT NOT NULL,
+            wariant TEXT NOT NULL,
+            koder TEXT NOT NULL,
+            zapisano_o TEXT NOT NULL,
+            szczegoly_json TEXT NOT NULL
+        )
+        """
+    )
+    return connection
+
+
+def _normalize_idno(idno) -> str:
+    idno = str(idno).strip()
+    try:
+        idno = str(int(float(idno)))
+    except (ValueError, TypeError):
+        pass
+    return idno
+
+
+def _import_case_assignments(status_df: pd.DataFrame, imported_by: str) -> Tuple[int, int, int]:
+    """Wczytuje plik Status.csv (kolumny: idno, osoba, paczka) i CAŁKOWICIE
+    zastępuje poprzedni przydział - zarówno przypisane przypadki (case_assignments),
+    jak i nieprzydzielone (case_unassigned, dawne 'Brak'). Wiersze 'Trening' oraz
+    o nierozpoznanym formacie paczki są pomijane. Zwraca
+    (liczba_przypisanych, liczba_nieprzydzielonych, liczba_pominiętych)."""
+    assigned_rows = []
+    unassigned_rows = []
+    skipped = 0
+    for _, r in status_df.iterrows():
+        idno = _normalize_idno(r.get("idno", ""))
+        osoba = str(r.get("osoba", "")).strip()
+        paczka_raw = str(r.get("paczka", "")).strip()
+        if not idno or not osoba:
+            skipped += 1
+            continue
+        if paczka_raw == "Brak":
+            unassigned_rows.append((idno, osoba))
+            continue
+        parsed = _parse_paczka(paczka_raw)
+        if parsed is None:
+            skipped += 1
+            continue
+        assigned_rows.append((idno, osoba, parsed["miesiac"], parsed["koder_przydzielony"], parsed["wariant"]))
+
+    now = _now_pl()
+    with closing(_coding_db()) as connection, connection:
+        connection.execute("DELETE FROM case_assignments")
+        connection.execute("DELETE FROM case_unassigned")
+        connection.executemany(
+            """
+            INSERT OR REPLACE INTO case_assignments (idno, osoba, miesiac, koder_przydzielony, wariant)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            assigned_rows,
+        )
+        connection.executemany(
+            "INSERT OR REPLACE INTO case_unassigned (idno, osoba) VALUES (?, ?)",
+            unassigned_rows,
+        )
+        connection.execute(
+            """
+            INSERT INTO case_assignments_meta (id, imported_at, imported_by, assigned_rows, unassigned_rows)
+            VALUES (1, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                imported_at = excluded.imported_at,
+                imported_by = excluded.imported_by,
+                assigned_rows = excluded.assigned_rows,
+                unassigned_rows = excluded.unassigned_rows
+            """,
+            (now, imported_by, len(assigned_rows), len(unassigned_rows)),
+        )
+    return len(assigned_rows), len(unassigned_rows), skipped
+
+
+def _assignment_meta() -> Optional[dict]:
+    with closing(_coding_db()) as connection:
+        row = connection.execute(
+            "SELECT imported_at, imported_by, assigned_rows, unassigned_rows FROM case_assignments_meta WHERE id = 1"
+        ).fetchone()
+    if row is None:
+        return None
+    return {
+        "imported_at": row[0], "imported_by": row[1],
+        "assigned_rows": row[2], "unassigned_rows": row[3],
+    }
+
+
+def _record_coding_event(idno, osoba: str, wariant: str, koder: str, isco_kod: Optional[str]) -> None:
+    """Zapisuje na bieżąco (real-time) na serwerze fakt zakodowania danego
+    przypadku - wywoływane z _save_respondent_meta przy każdym zapisie decyzji,
+    niezależnie od modułu (A/B/C). Nadpisuje poprzedni wpis, jeśli ten sam
+    przypadek zostanie zakodowany ponownie (np. poprawka) - to jest lekka
+    "bazowa ramka" statusu, patrz też _record_coding_details dla pełnego logu."""
+    idno = _normalize_idno(idno)
+    now = _now_pl()
+    with closing(_coding_db()) as connection, connection:
+        connection.execute(
+            """
+            INSERT OR REPLACE INTO coding_events (idno, osoba, wariant, koder, isco_kod, zapisano_o)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (idno, osoba, wariant, koder, isco_kod, now),
+        )
+
+
+def _record_coding_details(idno, osoba: str, wariant: str, koder: str, row: pd.Series) -> None:
+    """Dopisuje (append, nie nadpisuje) pełny zestaw szczegółów przebiegu
+    kodowania - kody na każdym poziomie, użyte zmienne, czasy, oceny AI,
+    uzasadnienia - do OSOBNEJ tabeli coding_details, celowo poza bazową ramką
+    ewidencji statusu (coding_events / _ewidencja_df)."""
+    idno = _normalize_idno(idno)
+    szczegoly = {}
+    for col in CODING_DETAIL_COLUMNS:
+        if col in row.index:
+            val = row[col]
+            szczegoly[col] = None if pd.isna(val) else (val.item() if hasattr(val, "item") else val)
+    now = _now_pl()
+    with closing(_coding_db()) as connection, connection:
+        connection.execute(
+            """
+            INSERT INTO coding_details (idno, osoba, wariant, koder, zapisano_o, szczegoly_json)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (idno, osoba, wariant, koder, now, json.dumps(szczegoly, ensure_ascii=False, default=str)),
+        )
+
+
+def _ewidencja_df() -> pd.DataFrame:
+    """Łączy przydział przypisanych przypadków (case_assignments) z faktycznymi
+    zapisami postępu (coding_events) po kluczu (idno, osoba, wariant). Nie
+    obejmuje 'Brak' (patrz _unassigned_df, osobna zakładka)."""
+    with closing(_coding_db()) as connection:
+        assignments = pd.read_sql_query("SELECT * FROM case_assignments", connection)
+        events = pd.read_sql_query("SELECT * FROM coding_events", connection)
+
+    if assignments.empty:
+        return pd.DataFrame(
+            columns=[
+                "idno", "osoba", "miesiac", "koder_przydzielony", "wariant",
+                "status", "koder_faktyczny", "zapisano_o", "isco_kod",
+            ]
+        )
+
+    merged = assignments.merge(events, on=["idno", "osoba", "wariant"], how="left")
+    merged["status"] = np.where(merged["koder"].notna(), "Wykonane", "Niewykonane")
+    merged = merged.rename(columns={"koder": "koder_faktyczny"})
+    return merged[
+        [
+            "idno", "osoba", "miesiac", "koder_przydzielony", "wariant",
+            "status", "koder_faktyczny", "zapisano_o", "isco_kod",
+        ]
+    ].sort_values(["miesiac", "koder_przydzielony", "wariant", "idno"])
+
+
+def _unassigned_df() -> pd.DataFrame:
+    with closing(_coding_db()) as connection:
+        return pd.read_sql_query(
+            "SELECT idno, osoba FROM case_unassigned ORDER BY idno", connection
+        )
+
+
+def _coding_details_df() -> pd.DataFrame:
+    with closing(_coding_db()) as connection:
+        raw = pd.read_sql_query(
+            "SELECT id, idno, osoba, wariant, koder, zapisano_o, szczegoly_json "
+            "FROM coding_details ORDER BY id DESC",
+            connection,
+        )
+    if raw.empty:
+        return raw
+    details = pd.json_normalize(raw["szczegoly_json"].apply(json.loads))
+    return pd.concat([raw.drop(columns=["szczegoly_json"]), details], axis=1)
+
+
+def _case_lookup(idno: str, osoba: str) -> dict:
+    """Zwraca dla danego (idno, osoba): status każdego przydzielonego wariantu
+    (wykonane/niewykonane, kto i kiedy), listę wariantów, których jeszcze
+    brakuje, oraz informację czy przypadek w ogóle jest przydzielony (czy
+    może jest w puli 'Brak'). Używane w zakładce 'Sprawdź case'."""
+    idno_norm = _normalize_idno(idno)
+    with closing(_coding_db()) as connection:
+        assignments = pd.read_sql_query(
+            "SELECT * FROM case_assignments WHERE idno = ? AND osoba = ?",
+            connection, params=(idno_norm, osoba),
+        )
+        events = pd.read_sql_query(
+            "SELECT * FROM coding_events WHERE idno = ? AND osoba = ?",
+            connection, params=(idno_norm, osoba),
+        )
+        is_brak = pd.read_sql_query(
+            "SELECT 1 FROM case_unassigned WHERE idno = ? AND osoba = ?",
+            connection, params=(idno_norm, osoba),
+        ).shape[0] > 0
+
+    if assignments.empty:
+        return {"found": False, "is_brak": is_brak, "table": pd.DataFrame(), "brakujace": []}
+
+    merged = assignments.merge(events, on=["idno", "osoba", "wariant"], how="left")
+    merged["status"] = np.where(merged["koder"].notna(), "Wykonane", "Niewykonane")
+    merged = merged.rename(columns={"koder": "koder_faktyczny"})
+    brakujace = merged.loc[merged["status"] == "Niewykonane", "wariant"].tolist()
+    table = merged[
+        ["wariant", "koder_przydzielony", "status", "koder_faktyczny", "zapisano_o", "isco_kod"]
+    ].sort_values("wariant")
+    return {"found": True, "is_brak": False, "table": table, "brakujace": brakujace}
+
+
+def render_ewidencja():
+    if st.session_state.get("username") not in ADMIN_USERS:
+        st.error("Brak uprawnień do ewidencji postępu kodowania.")
+        return
+
+    st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+    st.markdown('<div class="top-bar"></div>', unsafe_allow_html=True)
+    render_logo_header()
+    if st.button("← Wróć do strony głównej", key="back_ewidencja"):
+        go_to("home")
+        st.rerun()
+
+    st.title("Ewidencja postępu kodowania")
+
+    meta = _assignment_meta()
+    with st.expander("Podmień przydział (Status.csv)", expanded=meta is None):
+        if meta is not None:
+            st.caption(
+                f"Aktualnie wgrany przydział: {meta['assigned_rows']} przypisanych + "
+                f"{meta['unassigned_rows']} nieprzydzielonych ('Brak'), zaimportowany "
+                f"{meta['imported_at']} przez {meta['imported_by']}."
+            )
+        else:
+            st.caption("Nie wgrano jeszcze żadnego przydziału.")
+        st.caption("Wgranie pliku CAŁKOWICIE zastępuje poprzedni przydział.")
+        # Klucz widgetu zawiera licznik, który zwiększamy po każdym udanym imporcie
+        # (patrz niżej) - wymusza to całkowicie NOWY widget file_uploader przy
+        # kolejnym wejściu, zamiast pozostawiać poprzednio wybrany plik "przyklejony"
+        # do starego klucza (przez co podmiana na inny plik czasem nie działała).
+        uploader_key = f"uploader_status_{st.session_state.get('uploader_status_generation', 0)}"
+        status_file = st.file_uploader("Wybierz plik CSV", type=["csv"], key=uploader_key)
+        if status_file is not None and st.button("Importuj / podmień przydział", key="import_status_btn"):
+            status_df = read_csv_robust(status_file)
+            assigned, unassigned, skipped = _import_case_assignments(
+                status_df, imported_by=st.session_state.get("username", "")
+            )
+            st.session_state["uploader_status_generation"] = (
+                st.session_state.get("uploader_status_generation", 0) + 1
+            )
+            st.success(
+                f"Zaimportowano {assigned} przypisanych i {unassigned} nieprzydzielonych "
+                f"('Brak'), pominięto {skipped} wierszy (Trening/nierozpoznane)."
+            )
+            st.rerun()
+
+    tab_ewidencja, tab_brak, tab_lookup, tab_log = st.tabs(
+        ["Ewidencja", "Nieprzydzielone (Brak)", "Sprawdź case", "Log szczegółowy"]
+    )
+
+    with tab_ewidencja:
+        df = _ewidencja_df()
+        if df.empty:
+            st.info("Brak zaimportowanego przydziału - wgraj plik Status.csv powyżej.")
+        else:
+            total = len(df)
+            done = int((df["status"] == "Wykonane").sum())
+            col_m1, col_m2, col_m3 = st.columns(3)
+            col_m1.metric("Przydzielonych przypadków", total)
+            col_m2.metric("Wykonanych", done)
+            col_m3.metric("Pozostało", total - done)
+
+            col_f1, col_f2, col_f3, col_f4 = st.columns(4)
+            with col_f1:
+                miesiac_sel = st.selectbox("Miesiąc", ["Wszystkie"] + sorted(df["miesiac"].unique().tolist()))
+            with col_f2:
+                koder_sel = st.selectbox(
+                    "Koder przydzielony", ["Wszyscy"] + sorted(df["koder_przydzielony"].unique().tolist())
+                )
+            with col_f3:
+                wariant_sel = st.selectbox("Wariant", ["Wszystkie"] + sorted(df["wariant"].unique().tolist()))
+            with col_f4:
+                status_sel = st.selectbox("Status", ["Wszystkie", "Wykonane", "Niewykonane"])
+
+            filtered = df.copy()
+            if miesiac_sel != "Wszystkie":
+                filtered = filtered[filtered["miesiac"] == miesiac_sel]
+            if koder_sel != "Wszyscy":
+                filtered = filtered[filtered["koder_przydzielony"] == koder_sel]
+            if wariant_sel != "Wszystkie":
+                filtered = filtered[filtered["wariant"] == wariant_sel]
+            if status_sel != "Wszystkie":
+                filtered = filtered[filtered["status"] == status_sel]
+
+            st.dataframe(filtered, use_container_width=True, hide_index=True)
+            st.download_button(
+                "Pobierz widoczną tabelę (CSV)",
+                data=filtered.to_csv(index=False).encode("utf-8-sig"),
+                file_name="ewidencja_kodowania.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
+
+    with tab_brak:
+        brak_df = _unassigned_df()
+        st.metric("Nieprzydzielonych ('Brak')", len(brak_df))
+        if brak_df.empty:
+            st.info("Brak nieprzydzielonych przypadków w zaimportowanym pliku.")
+        else:
+            st.dataframe(brak_df, use_container_width=True, hide_index=True)
+            st.download_button(
+                "Pobierz listę nieprzydzielonych (CSV)",
+                data=brak_df.to_csv(index=False).encode("utf-8-sig"),
+                file_name="nieprzydzielone_brak.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
+
+    with tab_lookup:
+        st.caption("Sprawdź, którą metodą dany przypadek został (lub nie) zakodowany.")
+        col_l1, col_l2 = st.columns(2)
+        with col_l1:
+            lookup_idno = st.text_input("IDNO", key="lookup_idno").strip()
+        with col_l2:
+            lookup_osoba = st.selectbox("Osoba", ["Respondent", "Partner"], key="lookup_osoba")
+
+        if lookup_idno:
+            result = _case_lookup(lookup_idno, lookup_osoba)
+            if not result["found"]:
+                if result["is_brak"]:
+                    st.warning("Ten przypadek jest w puli 'Brak' - nieprzydzielony do żadnego kodera/wariantu.")
+                else:
+                    st.warning("Nie znaleziono takiego przypadku w zaimportowanym przydziale.")
+            else:
+                st.dataframe(result["table"], use_container_width=True, hide_index=True)
+                if result["brakujace"]:
+                    st.warning("Brakuje jeszcze: " + ", ".join(result["brakujace"]))
+                else:
+                    st.success("Wszystkie przydzielone warianty wykonane.")
+
+    with tab_log:
+        st.caption(
+            "Pełny, chronologiczny log każdego zapisu decyzji (kody na każdym poziomie, "
+            "użyte zmienne, czasy, oceny AI, uzasadnienia) - osobno od bazowej ewidencji "
+            "statusu powyżej. Jeden przypadek może mieć kilka wpisów, jeśli był kodowany "
+            "ponownie."
+        )
+        details_df = _coding_details_df()
+        if details_df.empty:
+            st.info("Brak zapisanych jeszcze żadnych szczegółów kodowania.")
+        else:
+            st.dataframe(details_df, use_container_width=True, hide_index=True)
+            st.download_button(
+                "Pobierz pełny log kodowania (CSV)",
+                data=details_df.to_csv(index=False).encode("utf-8-sig"),
+                file_name="log_szczegolowy_kodowania.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
+
+
+# ============================================================
 # STRONA GŁÓWNA
 # ============================================================
 def render_home():
@@ -1688,10 +2198,13 @@ def _manual_save_code(
     df_state_key: str,
     idx_state_key: str,
     qualifying_positions: list[int],
+    selected_vars: Optional[list[str]] = None,
 ) -> None:
     """Zapisuje kompletną decyzję Metody A i przechodzi do następnego przypadku."""
     for level, digit in enumerate(final_code, start=1):
         df.at[idx, f"ISCO_poziom{level}"] = digit
+    current_level = len(digits_so_far := st.session_state.get(f"manual_digits_{idx}", [])) + 1
+    df.at[idx, f"ISCO_poziom{current_level}_zmienne"] = ", ".join(selected_vars) if selected_vars else None
     df.at[idx, "ISCO_PRED"] = final_code
     df.at[idx, "ISCO_wybrany"] = final_code
     df.at[idx, "Kodowany_podmiot"] = target
@@ -1703,7 +2216,7 @@ def _manual_save_code(
         # Przy ponownym kodowaniu nie pozostawiamy komentarza ze starej decyzji.
         df.at[idx, "Uzasadnienie_finalne"] = None
         df.at[idx, "Decyzja_kodera_notatka"] = None
-    _save_respondent_meta(df, idx)
+    _save_respondent_meta(df, idx, df_state_key=df_state_key)
     st.session_state[df_state_key] = df
     st.session_state.pop(f"manual_step_{idx}", None)
     st.session_state.pop(f"manual_digits_{idx}", None)
@@ -1769,6 +2282,40 @@ def _manual_ctrl_enter_shortcut(idx: int) -> None:
     )
 
 
+def _render_selected_vars_caption(row, var_meta: dict, selected_vars: list[str]) -> None:
+    """Wyświetla zaznaczone w tabeli 'Dane respondenta' zmienne wraz z etykietą,
+    wartością respondenta i (jeśli dostępna) zdekodowaną kategorią - w jednolitym
+    formacie używanym we wszystkich modułach (Metoda A, kaskada w modułach B/C)."""
+    if not selected_vars:
+        st.caption("Brak zaznaczonych zmiennych w tabeli powyżej (kliknij nazwy kolumn, żeby je zaznaczyć).")
+        return
+
+    info_lines = []
+    for col in selected_vars:
+        raw_val = row.get(col)
+        value_labels = var_meta.get(col, {}).get("value_labels", {})
+        decoded = None
+        if pd.notna(raw_val) and value_labels:
+            key_candidates = [str(raw_val)]
+            try:
+                key_candidates.append(str(int(float(raw_val))))
+            except (ValueError, TypeError):
+                pass
+            for k in key_candidates:
+                if k in value_labels:
+                    decoded = value_labels[k]
+                    break
+        label = var_meta.get(col, {}).get("label", "")
+        line = f"**{col}**"
+        if label:
+            line += f" _{label}_"
+        line += f": wartość respondenta = `{raw_val}`"
+        if decoded:
+            line += f" → **{decoded}**"
+        info_lines.append(line)
+    st.caption("Zmienne zaznaczone w tabeli powyżej, użyte przy tej decyzji:  \n" + "  \n".join(info_lines))
+
+
 def render_manual_step(df, idx: int, row, df_state_key: str = "manual_df", idx_state_key: str = "manual_idx"):
     level = st.session_state.setdefault(f"manual_step_{idx}", 1)
     digits = st.session_state.setdefault(f"manual_digits_{idx}", [])
@@ -1791,6 +2338,17 @@ def render_manual_step(df, idx: int, row, df_state_key: str = "manual_df", idx_s
     target = _get_coding_target(df_state_key)
     n = len(df)
     qualifying_positions = _qualifying_positions(df, target)
+
+    # Zmienne, z których korzystał koder = dowolna kombinacja kolumn
+    # zaznaczonych w widocznej tabeli "Dane respondenta" (patrz analogiczna
+    # logika w render_cascade_step).
+    source_cols = set(visible_df_for_mode(df.iloc[[idx]], target).columns)
+    var_meta = load_var_metadata(target)
+    table_selection = st.session_state.get(_resp_table_key(idx, df_state_key), {})
+    clicked_cols = table_selection.get("selection", {}).get("columns", [])
+    selected_vars = [c for c in clicked_cols if c in source_cols]
+
+    _render_selected_vars_caption(row, var_meta, selected_vars)
 
     st.markdown("**Lub wpisz od razu pełny, 4-cyfrowy kod ISCO-08:**")
     direct_code = st.text_input(
@@ -1845,7 +2403,7 @@ def render_manual_step(df, idx: int, row, df_state_key: str = "manual_df", idx_s
         else:
             _manual_save_code(
                 df, idx, direct_code, target, uzasadnienie, df_state_key,
-                idx_state_key, qualifying_positions,
+                idx_state_key, qualifying_positions, selected_vars,
             )
             st.rerun()
 
@@ -1872,12 +2430,13 @@ def render_manual_step(df, idx: int, row, df_state_key: str = "manual_df", idx_s
                 final_code = (prefix + "0" * (5 - level))[:4]
                 _manual_save_code(
                     df, idx, final_code, target, uzasadnienie, df_state_key,
-                    idx_state_key, qualifying_positions,
+                    idx_state_key, qualifying_positions, selected_vars,
                 )
                 st.rerun()
             elif level < 4:
                 digits.append(chosen_code[-1])
                 df.at[idx, f"ISCO_poziom{level}"] = chosen_code[-1]
+                df.at[idx, f"ISCO_poziom{level}_zmienne"] = ", ".join(selected_vars) if selected_vars else None
                 st.session_state[df_state_key] = df
                 st.session_state[f"manual_step_{idx}"] = level + 1
                 st.rerun()
@@ -1885,7 +2444,7 @@ def render_manual_step(df, idx: int, row, df_state_key: str = "manual_df", idx_s
                 final_code = chosen_code
                 _manual_save_code(
                     df, idx, final_code, target, uzasadnienie, df_state_key,
-                    idx_state_key, qualifying_positions,
+                    idx_state_key, qualifying_positions, selected_vars,
                 )
                 st.rerun()
 
@@ -2027,10 +2586,14 @@ def render_classify_manual():
 
     _display_respondent_idno(row)
     st.write("Dane respondenta:")
+    st.caption("Kliknij nazwy kolumn (zmiennych), z których korzystasz przy klasyfikacji.")
     st.dataframe(
         visible_df_for_mode(df.iloc[[idx]], mode_manual),
         use_container_width=True,
         column_config=build_column_config_for_respondent(row, load_var_metadata(mode_manual)),
+        on_select="rerun",
+        selection_mode=["multi-column"],
+        key=_resp_table_key(idx, "manual_df"),
     )
 
     cols = _target_cols("manual_df")
@@ -2271,7 +2834,7 @@ def render_pa_top10_step(df, idx: int, row, prefix: str, df_state_key: str, idx_
                         df.at[idx, "Uzasadnienie_finalne"] = uzasadnienie_top10.strip()
                     df.at[idx, "Brak_mozliwosci_zakodowania"] = None
                     df.at[idx, "Kodowany_podmiot"] = target
-                    _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_top10_1_5")
+                    _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_top10_1_5", df_state_key=df_state_key)
                     st.session_state[df_state_key] = df
                     st.session_state.pop(f"pa1_confirmed_{idx}", None)
                     st.session_state.pop(cache_key, None)
@@ -2282,7 +2845,7 @@ def render_pa_top10_step(df, idx: int, row, prefix: str, df_state_key: str, idx_
                 if uzasadnienie_top10.strip():
                     df.at[idx, "Uzasadnienie_finalne"] = uzasadnienie_top10.strip()
                 df.at[idx, "Kodowany_podmiot"] = target
-                _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_top10_1_5")
+                _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_top10_1_5", df_state_key=df_state_key)
                 st.session_state[df_state_key] = df
                 st.session_state.pop(f"pa1_confirmed_{idx}", None)
                 st.session_state.pop(cache_key, None)
@@ -2306,7 +2869,7 @@ def render_pa_top10_step(df, idx: int, row, prefix: str, df_state_key: str, idx_
                 df.at[idx, "Ranking_pozycja_wybranego_kodu"] = rank
                 df.at[idx, "Score_wybranego_kodu"] = score
                 df.at[idx, "Kodowany_podmiot"] = target
-                _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_top10_1_5")
+                _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_top10_1_5", df_state_key=df_state_key)
                 st.session_state[df_state_key] = df
                 st.session_state.pop(f"pa1_confirmed_{idx}", None)
                 st.session_state.pop(cache_key, None)
@@ -2629,7 +3192,7 @@ def _cascade_save_direct_code(
     df.at[idx, "Brak_mozliwosci_zakodowania"] = None
     if uzasadnienie.strip():
         df.at[idx, "Uzasadnienie_finalne"] = uzasadnienie.strip()
-    _save_respondent_meta(df, idx)
+    _save_respondent_meta(df, idx, df_state_key=df_state_key)
     st.session_state[df_state_key] = df
     _cancel_cascade(idx)
     st.session_state[idx_state_key] = _next_qualifying_idx(qualifying_positions, idx, len(df))
@@ -2686,11 +3249,35 @@ def _get_rank_and_score(candidates: pd.DataFrame, chosen_code) -> Tuple[Optional
     return rank, score
 
 
-def _save_respondent_meta(df, idx: int, ai_helpfulness: Optional[int] = None, ai_column: Optional[str] = None):
+def _get_row_idno(row: pd.Series) -> Optional[str]:
+    """Zwraca znormalizowaną wartość IDNO (jako string, bez '.0') niezależnie
+    od wielkości liter nazwy kolumny i typu danych - do użytku przy zapisie
+    zdarzeń kodowania (patrz _record_coding_event)."""
+    idno_col = next((col for col in row.index if str(col).strip().lower() == "idno"), None)
+    if idno_col is None or pd.isna(row[idno_col]):
+        return None
+    value = row[idno_col]
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value).strip()
+
+
+def _save_respondent_meta(
+    df,
+    idx: int,
+    ai_helpfulness: Optional[int] = None,
+    ai_column: Optional[str] = None,
+    df_state_key: Optional[str] = None,
+):
     """Zapisuje czas kodowania (sekundy), czas do pierwszej interakcji z listą
     kandydatów, czy koder wracał (cofał się) i ocenę przydatności AI (1-5) -
     w kolumnie zależnej od trybu, którym koder faktycznie kodował tego
-    respondenta (ai_column: "Ocena_AI_top10_1_5" albo "Ocena_AI_kaskadowo_1_5")."""
+    respondenta (ai_column: "Ocena_AI_top10_1_5" albo "Ocena_AI_kaskadowo_1_5").
+
+    Jeśli podano `df_state_key`, dodatkowo zapisuje na bieżąco fakt zakodowania
+    tego przypadku do serwerowej ewidencji (patrz _record_coding_event) - dotyczy
+    to każdego modułu (A/B/C), bo ta funkcja jest wywoływana przy KAŻDYM
+    finalnym zapisie decyzji, niezależnie od ścieżki (ręczne, kaskada, top10)."""
     start = st.session_state.get(f"hitl_start_time_{idx}", time.time())
     now = time.time()
     elapsed = round(now - start, 1)
@@ -2705,6 +3292,27 @@ def _save_respondent_meta(df, idx: int, ai_helpfulness: Optional[int] = None, ai
     st.session_state.pop(f"hitl_start_time_{idx}", None)
     st.session_state.pop(f"hitl_wracal_{idx}", None)
     st.session_state.pop(f"hitl_first_interaction_time_{idx}", None)
+
+    if df_state_key is not None:
+        wariant = DF_STATE_KEY_TO_WARIANT.get(df_state_key)
+        idno = _get_row_idno(df.loc[idx])
+        osoba = df.at[idx, "Kodowany_podmiot"] if "Kodowany_podmiot" in df.columns else None
+        if wariant is not None and idno is not None and osoba:
+            koder = st.session_state.get("username", "")
+            _record_coding_event(
+                idno=idno,
+                osoba=str(osoba),
+                wariant=wariant,
+                koder=koder,
+                isco_kod=df.at[idx, "ISCO_wybrany"] if "ISCO_wybrany" in df.columns else None,
+            )
+            _record_coding_details(
+                idno=idno,
+                osoba=str(osoba),
+                wariant=wariant,
+                koder=koder,
+                row=df.loc[idx],
+            )
 
 
 def render_cascade_step(df, idx: int, row, df_state_key: str = "hitl_df", idx_state_key: str = "hitl_idx"):
@@ -2812,33 +3420,7 @@ def render_cascade_step(df, idx: int, row, df_state_key: str = "hitl_df", idx_st
         clicked_cols = table_selection.get("selection", {}).get("columns", [])
         selected_vars = [c for c in clicked_cols if c in source_cols]
 
-        if selected_vars:
-            info_lines = []
-            for col in selected_vars:
-                raw_val = row.get(col)
-                value_labels = var_meta.get(col, {}).get("value_labels", {})
-                decoded = None
-                if pd.notna(raw_val) and value_labels:
-                    key_candidates = [str(raw_val)]
-                    try:
-                        key_candidates.append(str(int(float(raw_val))))
-                    except (ValueError, TypeError):
-                        pass
-                    for k in key_candidates:
-                        if k in value_labels:
-                            decoded = value_labels[k]
-                            break
-                label = var_meta.get(col, {}).get("label", "")
-                line = f"**{col}**"
-                if label:
-                    line += f" _{label}_"
-                line += f": wartość respondenta = `{raw_val}`"
-                if decoded:
-                    line += f" → **{decoded}**"
-                info_lines.append(line)
-            st.caption("Zmienne zaznaczone w tabeli powyżej, użyte przy tej decyzji:  \n" + "  \n".join(info_lines))
-        else:
-            st.caption("Brak zaznaczonych zmiennych w tabeli powyżej (kliknij nazwy kolumn, żeby je zaznaczyć).")
+        _render_selected_vars_caption(row, var_meta, selected_vars)
 
         # Komentarz i ocena AI pojawiają się tylko na ostatnim FAKTYCZNIE
         # osiągniętym poziomie szczegółowości: albo poziom 4, albo moment
@@ -2927,10 +3509,10 @@ def render_cascade_step(df, idx: int, row, df_state_key: str = "hitl_df", idx_st
                 if show_uzasadnienie and uzasadnienie:
                     df.at[idx, "Uzasadnienie_finalne"] = uzasadnienie.strip()
 
-                # UWAGA: zaznaczenie kolumn w tabeli "Dane respondenta" resetuje się
-                # samo przy przejściu na kolejny poziom kaskady, bo klucz widgetu
-                # (_resp_table_key) zależy od aktualnego cascade_step_{idx} - nowy
-                # poziom = zupełnie nowy widget, bez wcześniejszego zaznaczenia.
+                # Zaznaczenie kolumn w tabeli "Dane respondenta" NIE resetuje się
+                # przy przejściu na kolejny poziom kaskady (_resp_table_key nie
+                # zależy już od cascade_step_{idx}) - koder widzi te same
+                # zaznaczone zmienne na każdym kolejnym kroku, aż do zmiany osoby.
 
                 if is_uncodable:
                     # Koder jednoznacznie stwierdził, że nie da się zakodować tej
@@ -2939,7 +3521,7 @@ def render_cascade_step(df, idx: int, row, df_state_key: str = "hitl_df", idx_st
                     # krokach), tylko oznaczamy przypadek i przechodzimy dalej.
                     df.at[idx, "Brak_mozliwosci_zakodowania"] = "Tak"
                     df.at[idx, "Kodowany_podmiot"] = target
-                    _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_kaskadowo_1_5")
+                    _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_kaskadowo_1_5", df_state_key=df_state_key)
                     st.session_state[df_state_key] = df
                     _cancel_cascade(idx)
                     st.session_state[idx_state_key] = _next_qualifying_idx(qualifying_positions, idx, n)
@@ -2955,7 +3537,7 @@ def render_cascade_step(df, idx: int, row, df_state_key: str = "hitl_df", idx_st
                     df.at[idx, "ISCO_PRED"] = final_code
                     df.at[idx, "ISCO_wybrany"] = final_code
                     df.at[idx, "Kodowany_podmiot"] = target
-                    _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_kaskadowo_1_5")
+                    _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_kaskadowo_1_5", df_state_key=df_state_key)
                     st.session_state[df_state_key] = df
                     _cancel_cascade(idx)
                     st.session_state[idx_state_key] = _next_qualifying_idx(qualifying_positions, idx, n)
@@ -2973,7 +3555,7 @@ def render_cascade_step(df, idx: int, row, df_state_key: str = "hitl_df", idx_st
                         df.at[idx, "ISCO_PRED"] = final_code
                         df.at[idx, "ISCO_wybrany"] = final_code
                         df.at[idx, "Kodowany_podmiot"] = target
-                        _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_kaskadowo_1_5")
+                        _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_kaskadowo_1_5", df_state_key=df_state_key)
                         st.session_state[df_state_key] = df
                         _cancel_cascade(idx)
                         st.session_state[idx_state_key] = _next_qualifying_idx(qualifying_positions, idx, n)
@@ -3031,19 +3613,17 @@ def _show_variable_dialog(col: str, raw_val, label: str, value_labels: dict):
 
 
 def _resp_table_key(idx: int, df_state_key: str) -> str:
-    """Klucz widgetu tabeli 'Dane respondenta' (st.dataframe z zaznaczaniem kolumn),
-    zależny od aktualnego kroku kaskady (cascade_step_{idx}).
+    """Klucz widgetu tabeli 'Dane respondenta' (st.dataframe z zaznaczaniem kolumn).
 
-    Dzięki temu przy przejściu do kolejnego lub poprzedniego kroku kaskady tabela
-    renderuje się jako CAŁKOWICIE NOWY widget - bez tego, kolumna kliknięta
-    (zaznaczona) na jednym kroku zostawałaby "wciśnięta" (podświetlona) również
-    na kolejnym kroku, bo Streamlit potrafi zachować stan zaznaczenia widgetu
-    po stronie przeglądarki nawet po wyczyszczeniu session_state, dopóki klucz
-    widgetu się nie zmienia."""
-    level = st.session_state.get(f"cascade_step_{idx}", 0)
-    # Namespace modułu zapobiega współdzieleniu stanu tabeli pomiędzy trybem
-    # 2 (hitl1d_df) i 3 (hitl_df) dla tego samego numeru respondenta/kroku.
-    return f"resp_table_{df_state_key}_{idx}_lvl{level}"
+    Klucz NIE zależy od aktualnego kroku kaskady (cascade_step_{idx}) - dzięki
+    temu zaznaczone kolumny (zmienne) pozostają zaznaczone przy przejściu do
+    kolejnego lub poprzedniego kroku kaskady, zamiast odznaczać się na każdym
+    nowym ekranie. Widget zachowuje stan zaznaczenia, dopóki koder nie przejdzie
+    do innego respondenta (idx) lub nie zmieni się namespace modułu.
+
+    Namespace modułu zapobiega współdzieleniu stanu tabeli pomiędzy trybem
+    2 (hitl1d_df) i 3 (hitl_df) dla tego samego numeru respondenta."""
+    return f"resp_table_{df_state_key}_{idx}"
 
 
 def _handle_table_column_click(df, idx: int, row, var_meta: dict, selection_key: str):
@@ -3442,7 +4022,7 @@ def render_classify_hitl():
                         df.at[idx, "Uzasadnienie_finalne"] = uzasadnienie_top10.strip()
                     df.at[idx, "Brak_mozliwosci_zakodowania"] = None
                     df.at[idx, "Kodowany_podmiot"] = target
-                    _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_top10_1_5")
+                    _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_top10_1_5", df_state_key="hitl_df")
                     st.session_state["hitl_df"] = df
                     st.session_state["hitl_idx"] = _next_qualifying_idx(qualifying_positions, idx, n)
                     st.rerun()
@@ -3451,7 +4031,7 @@ def render_classify_hitl():
                 if uzasadnienie_top10.strip():
                     df.at[idx, "Uzasadnienie_finalne"] = uzasadnienie_top10.strip()
                 df.at[idx, "Kodowany_podmiot"] = target
-                _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_top10_1_5")
+                _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_top10_1_5", df_state_key="hitl_df")
                 st.session_state["hitl_df"] = df
                 st.session_state["hitl_idx"] = _next_qualifying_idx(qualifying_positions, idx, n)
                 st.rerun()
@@ -3467,7 +4047,7 @@ def render_classify_hitl():
                 df.at[idx, "Ranking_pozycja_wybranego_kodu"] = rank
                 df.at[idx, "Score_wybranego_kodu"] = score
                 df.at[idx, "Kodowany_podmiot"] = target
-                _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_top10_1_5")
+                _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_top10_1_5", df_state_key="hitl_df")
                 st.session_state["hitl_df"] = df
                 st.session_state["hitl_idx"] = _next_qualifying_idx(qualifying_positions, idx, n)
                 st.rerun()
@@ -3513,6 +4093,9 @@ with st.sidebar:
         if st.button("Wyniki ankiet", use_container_width=True, key="sidebar_questionnaire_results"):
             go_to("questionnaire_results")
             st.rerun()
+        if st.button("Ewidencja kodowania", use_container_width=True, key="sidebar_ewidencja"):
+            go_to("ewidencja")
+            st.rerun()
     if st.button("Wyloguj", use_container_width=True):
         for key in ("authenticated", "username"):
             st.session_state.pop(key, None)
@@ -3531,3 +4114,5 @@ elif st.session_state.page == "questionnaire":
     render_questionnaire()
 elif st.session_state.page == "questionnaire_results":
     render_questionnaire_results()
+elif st.session_state.page == "ewidencja":
+    render_ewidencja()
