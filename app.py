@@ -697,8 +697,10 @@ def _format_candidate_label(isco_code: str, title_pl: str, title_en: str = "", s
     to osobna linia, więc jej ewentualne zawinięcie nie psuje głównej."""
     title_display = _lower_first(title_pl)
     suffix = f" - dopasowanie: {score:.3f}" if score is not None else ""
-    prefix = f"{isco_code} — "
-    budget = MAX_LABEL_LINE_LEN - len(prefix) - len(suffix)
+    prefix = f"**{isco_code}** — "
+    # Liczymy budżet znaków bez markdownowych gwiazdek (**), żeby pogrubienie
+    # nie skracało realnie dostępnego miejsca na nazwę zawodu.
+    budget = MAX_LABEL_LINE_LEN - (len(prefix) - 4) - len(suffix)
     if budget > 10 and len(title_display) > budget:
         title_display = title_display[: budget - 1].rstrip(" ,;.-") + "…"
     label = prefix + title_display + suffix
@@ -1708,22 +1710,41 @@ def _manual_save_code(
     st.session_state[idx_state_key] = _next_qualifying_idx(qualifying_positions, idx, len(df))
 
 
-def _manual_ctrl_enter_shortcut(idx: int) -> None:
-    """Łączy Ctrl/Cmd+Enter z głównym przyciskiem bieżącego kroku Metody A."""
+def _ctrl_enter_shortcut(
+    handler_key: str,
+    fallback_labels: list[str],
+    direct_input_aria_label: Optional[str] = None,
+    direct_save_label: Optional[str] = None,
+) -> None:
+    """Uniwersalny skrót klawiszowy Ctrl+Enter (na macOS równiez Cmd+Enter,
+    dzięki nasłuchiwaniu jednocześnie na ctrlKey i metaKey - stąd działa tak
+    samo na Windows, Linux i macOS) uruchamiający główny przycisk "dalej" na
+    bieżącym ekranie kodowania.
+
+    Jeśli podano `direct_input_aria_label` i `direct_save_label`, a pole o tej
+    etykiecie ma aktualnie wpisaną wartość, klikany jest przycisk zapisu kodu
+    wpisanego ręcznie (`direct_save_label`) zamiast przycisków z listy
+    `fallback_labels` - analogicznie jak w Metodzie A i kaskadzie, gdzie oba
+    mechanizmy (wybór z listy / wpisanie kodu) mają osobne przyciski."""
+    fallback_json = json.dumps(fallback_labels)
+    direct_save_json = json.dumps(direct_save_label) if direct_save_label else "null"
+    aria_json = json.dumps(direct_input_aria_label) if direct_input_aria_label else "null"
     components.html(
         f"""
         <script>
         const doc = window.parent.document;
-        const handlerKey = '__manualCtrlEnterHandler';
+        const handlerKey = '{handler_key}';
         if (window.parent[handlerKey]) {{
             doc.removeEventListener('keydown', window.parent[handlerKey], true);
         }}
         window.parent[handlerKey] = (event) => {{
             if (!(event.ctrlKey || event.metaKey) || event.key !== 'Enter') return;
-            const directInput = doc.querySelector('input[placeholder="np. 2512"]');
-            const labels = directInput && directInput.value.trim()
-                ? ['Zapisz pełny kod i przejdź dalej']
-                : ['Zatwierdź kod finalny', 'Dalej →'];
+            const ariaLabel = {aria_json};
+            const directSaveLabel = {direct_save_json};
+            const directInput = ariaLabel ? doc.querySelector(`input[aria-label="${{ariaLabel}}"]`) : null;
+            const labels = (directInput && directInput.value.trim() && directSaveLabel)
+                ? [directSaveLabel]
+                : {fallback_json};
             const buttons = [...doc.querySelectorAll('button')];
             const button = buttons.find((item) => labels.includes(item.innerText.trim()));
             if (button && !button.disabled) {{
@@ -1735,6 +1756,16 @@ def _manual_ctrl_enter_shortcut(idx: int) -> None:
         </script>
         """,
         height=0,
+    )
+
+
+def _manual_ctrl_enter_shortcut(idx: int) -> None:
+    """Łączy Ctrl/Cmd+Enter z głównym przyciskiem bieżącego kroku Metody A."""
+    _ctrl_enter_shortcut(
+        handler_key="__manualCtrlEnterHandler",
+        fallback_labels=["Zatwierdź kod finalny", "Dalej →"],
+        direct_input_aria_label="Pełny kod ISCO-08",
+        direct_save_label="Zapisz pełny kod i przejdź dalej",
     )
 
 
@@ -1757,12 +1788,6 @@ def render_manual_step(df, idx: int, row, df_state_key: str = "manual_df", idx_s
         args=(idx,),
     )
 
-    uzasadnienie = st.text_area(
-        "Uzasadnienie / komentarz do finalnej decyzji (opcjonalnie)",
-        key=f"manual_uzasadnienie_{idx}_{level}_{prefix}",
-        height=70,
-    )
-
     target = _get_coding_target(df_state_key)
     n = len(df)
     qualifying_positions = _qualifying_positions(df, target)
@@ -1772,11 +1797,38 @@ def render_manual_step(df, idx: int, row, df_state_key: str = "manual_df", idx_s
         "Pełny kod ISCO-08",
         value="",
         max_chars=4,
-        placeholder="np. 2512",
+        placeholder="",
         key=f"manual_direct_code_{idx}",
         label_visibility="collapsed",
     ).strip()
+
+    uzasadnienie = st.text_area(
+        "Uzasadnienie / komentarz do finalnej decyzji (opcjonalnie)",
+        key=f"manual_uzasadnienie_{idx}_{level}_{prefix}",
+        height=70,
+    )
+
     valid_final_codes = set(load_embeddings_level(4)[3])
+    valid_level1_codes = set(load_embeddings_level(1)[3])
+    valid_level2_codes = set(load_embeddings_level(2)[3])
+    valid_level3_codes = set(load_embeddings_level(3)[3])
+
+    def _direct_code_is_valid(code: str) -> bool:
+        """Akceptuje pełny, konkretny kod ISCO-08 (poziom 4) ORAZ kod
+        niedoprecyzowany - prefiks o długości 1-3 cyfr dopełniony zerami do
+        4 cyfr (np. 5200 = grupa 52, nieustalona dokładna cyfra), analogicznie
+        do opcji "Brak możliwości ustalenia dokładnej cyfry" w module B/C
+        i w kodowaniu kaskadowym."""
+        if code in valid_final_codes:
+            return True
+        if code.endswith("000") and code[:1] in valid_level1_codes:
+            return True
+        if code.endswith("00") and not code.endswith("000") and code[:2] in valid_level2_codes:
+            return True
+        if code.endswith("0") and not code.endswith("00") and code[:3] in valid_level3_codes:
+            return True
+        return False
+
     if st.button(
         "Zapisz pełny kod i przejdź dalej",
         type="primary",
@@ -1785,8 +1837,11 @@ def render_manual_step(df, idx: int, row, df_state_key: str = "manual_df", idx_s
     ):
         if not (len(direct_code) == 4 and direct_code.isdigit()):
             st.warning("Wpisz 4 cyfry kodu ISCO-08.")
-        elif direct_code not in valid_final_codes:
-            st.warning("Podany kod nie występuje na liście kodów ISCO-08.")
+        elif not _direct_code_is_valid(direct_code):
+            st.warning(
+                "Podany kod nie występuje na liście kodów ISCO-08 i nie jest poprawnym "
+                "prefiksem dopełnionym zerami (np. 5200)."
+            )
         else:
             _manual_save_code(
                 df, idx, direct_code, target, uzasadnienie, df_state_key,
@@ -2058,19 +2113,33 @@ def render_pa_digit1_step(df, idx: int, row, df_state_key: str, idx_state_key: s
 
     is_confirm = decision == "Tak, zatwierdzam"
     button_label = "Zatwierdź i pokaż dopasowane kody" if is_confirm else "Odrzuć i koduj od nowa (kaskadowo)"
-    if st.button(button_label, type="primary", use_container_width=True, key=f"pa1_next_{idx}"):
-        df.at[idx, "Cyfra1_zatwierdzona_expert"] = "Tak" if is_confirm else "Nie"
-        if not is_confirm and komentarz.strip():
-            df.at[idx, "Powod_odrzucenia_cyfry"] = komentarz.strip()
-        st.session_state[df_state_key] = df
 
-        if is_confirm:
-            df.at[idx, "ISCO_poziom1"] = proposed_code
-            st.session_state[f"pa1_confirmed_{idx}"] = proposed_code
-        else:
-            st.session_state[f"hitl_wracal_{idx}"] = True
-            _start_cascade(idx)
-        st.rerun()
+    target = _get_coding_target(df_state_key)
+    qualifying_positions = _qualifying_positions(df, target)
+
+    col_next, col_prev = st.columns(2)
+    with col_next:
+        if st.button(button_label, type="primary", use_container_width=True, key=f"pa1_next_{idx}"):
+            df.at[idx, "Cyfra1_zatwierdzona_expert"] = "Tak" if is_confirm else "Nie"
+            if not is_confirm and komentarz.strip():
+                df.at[idx, "Powod_odrzucenia_cyfry"] = komentarz.strip()
+            st.session_state[df_state_key] = df
+
+            if is_confirm:
+                df.at[idx, "ISCO_poziom1"] = proposed_code
+                st.session_state[f"pa1_confirmed_{idx}"] = proposed_code
+            else:
+                st.session_state[f"hitl_wracal_{idx}"] = True
+                _start_cascade(idx)
+            st.rerun()
+    with col_prev:
+        prev_idx = _prev_qualifying_idx(qualifying_positions, idx)
+        prev_label = "← Poprzedni partner" if target == "Partner" else "← Poprzedni respondent"
+        if prev_idx != idx and st.button(prev_label, use_container_width=True, key=f"pa1_prev_{idx}"):
+            st.session_state[f"hitl_wracal_{prev_idx}"] = True
+            st.session_state.pop(f"pa1_confirmed_{prev_idx}", None)
+            st.session_state[idx_state_key] = prev_idx
+            st.rerun()
 
 
 def render_pa_top10_step(df, idx: int, row, prefix: str, df_state_key: str, idx_state_key: str):
@@ -2107,7 +2176,6 @@ def render_pa_top10_step(df, idx: int, row, prefix: str, df_state_key: str, idx_
 
     ranking = st.session_state[cache_key]
 
-    NO_MATCH_OPTION = "Brak poprawnego kodu (decyzja kodera)"
     NO_CODE_OPTION = "Brak możliwości zakodowania do kodu ISCO-08 (przejście do następnej osoby)"
     fill_code = f"{prefix}000"
     NO_DETERMINATION_OPTION = (
@@ -2115,12 +2183,12 @@ def render_pa_top10_step(df, idx: int, row, prefix: str, df_state_key: str, idx_
     )
     options = [_format_candidate_label(r.isco_code, r.title_pl, getattr(r, "title_en", ""), r.score) for r in ranking.itertuples()]
     options.append(NO_DETERMINATION_OPTION)
-    options.append(NO_MATCH_OPTION)
     options.append(NO_CODE_OPTION)
 
     choice = st.radio(
         "Wybierz właściwy kod ISCO-08",
         options=options,
+        index=None,
         key=f"pa_top10_choice_{idx}",
         on_change=_mark_first_interaction,
         args=(idx,),
@@ -2128,24 +2196,11 @@ def render_pa_top10_step(df, idx: int, row, prefix: str, df_state_key: str, idx_
 
     decyzja_kodera_zawod = None
     decyzja_kodera_notatka = None
-    decyzja_kodera_kod = ""
     is_uncodable = choice == NO_CODE_OPTION
     is_no_determination = choice == NO_DETERMINATION_OPTION
 
-    if choice == NO_MATCH_OPTION:
+    if choice is None:
         chosen_code = None
-        decyzja_kodera_kod = st.text_input(
-            "Proszę wpisać poprawny kod ISCO-08",
-            key=f"pa_top10_manual_kod_{idx}",
-            max_chars=4,
-        )
-        decyzja_kodera_notatka = st.text_area(
-            "Notatka - proszę opisać, o co chodzi w tym przypadku",
-            key=f"pa_top10_manual_notatka_{idx}",
-            height=80,
-        )
-        if decyzja_kodera_kod.strip().isdigit() and len(decyzja_kodera_kod.strip()) == 4:
-            chosen_code = decyzja_kodera_kod.strip()
     elif is_no_determination:
         chosen_code = fill_code
     elif is_uncodable:
@@ -2153,6 +2208,20 @@ def render_pa_top10_step(df, idx: int, row, prefix: str, df_state_key: str, idx_
     else:
         choice_idx = options.index(choice)
         chosen_code = ranking.iloc[choice_idx]["isco_code"]
+
+    if st.button(
+        "**← Cofnij do wyboru 1. cyfry**",
+        key=f"pa_top10_back_to_digit1_{idx}",
+        use_container_width=True,
+    ):
+        # Cofa zatwierdzenie 1. cyfry - respondent wraca do render_pa_digit1_step
+        # (patrz warunek `if pa1_confirmed:` w render_classify_hitl_1digit),
+        # gdzie można ponownie zatwierdzić albo odrzucić przyporządkowaną cyfrę.
+        df.at[idx, "Cyfra1_zatwierdzona_expert"] = None
+        st.session_state[df_state_key] = df
+        st.session_state.pop(f"pa1_confirmed_{idx}", None)
+        st.session_state.pop(cache_key, None)
+        st.rerun()
 
     # Ocena pomocności listy 10 dopasowanych kodów - wymagana zawsze, niezależnie
     # od tego, czy koder wybierze jeden z nich, czy przejdzie do kodowania
@@ -2162,20 +2231,52 @@ def render_pa_top10_step(df, idx: int, row, prefix: str, df_state_key: str, idx_
         key=f"pa_top10_ai_helpfulness_{idx}",
     )
 
-    # Opcjonalna notatka do wyboru - dostępna zawsze, niezależnie od tego, czy
-    # koder wybrał jeden z 10 dopasowanych kodów, czy "brak poprawnego kodu"
-    # (na wzór pola "Uzasadnienie / komentarz" z trybu kaskadowego).
+    st.markdown("**Lub wpisz od razu pełny, 4-cyfrowy kod ISCO-08:**")
+    direct_code = st.text_input(
+        "Pełny kod ISCO-08",
+        value="",
+        max_chars=4,
+        placeholder="",
+        key=f"pa_top10_direct_code_{idx}",
+        label_visibility="collapsed",
+    ).strip()
+
     uzasadnienie_top10 = st.text_area(
         "Uzasadnienie / komentarz do wyboru (opcjonalnie)",
         key=f"pa_top10_uzasadnienie_{idx}",
         height=70,
     )
 
+    valid_final_codes = set(load_embeddings_level(4)[3])
+
     col_btn1, col_btn2 = st.columns(2)
     with col_btn1:
-        if st.button("Zapisz wybór i przejdź dalej", use_container_width=True, key=f"pa_top10_save_{idx}"):
-            if choice == NO_MATCH_OPTION and not chosen_code:
-                st.warning("Proszę wpisać poprawny, 4-cyfrowy kod ISCO-08 przed zapisaniem.")
+        if st.button("Zapisz i przejdź dalej", type="primary", use_container_width=True, key=f"pa_top10_save_{idx}"):
+            if direct_code:
+                # Ręcznie wpisany kod ma pierwszeństwo przed zaznaczeniem na liście
+                # radio - koder mógł zaznaczyć jakąś opcję wcześniej, a potem
+                # zmienić zdanie i wpisać kod bezpośrednio.
+                if not (len(direct_code) == 4 and direct_code.isdigit()):
+                    st.warning("Wpisz 4 cyfry kodu ISCO-08.")
+                elif direct_code not in valid_final_codes:
+                    st.warning("Podany kod nie występuje na liście kodów ISCO-08.")
+                else:
+                    df.at[idx, "ISCO_wybrany"] = direct_code
+                    df.at[idx, "ISCO_poziom1"] = direct_code[0]
+                    df.at[idx, "ISCO_poziom2"] = direct_code[1]
+                    df.at[idx, "ISCO_poziom3"] = direct_code[2]
+                    df.at[idx, "ISCO_poziom4"] = direct_code[3]
+                    df.at[idx, "ISCO_PRED"] = direct_code
+                    if uzasadnienie_top10.strip():
+                        df.at[idx, "Uzasadnienie_finalne"] = uzasadnienie_top10.strip()
+                    df.at[idx, "Brak_mozliwosci_zakodowania"] = None
+                    df.at[idx, "Kodowany_podmiot"] = target
+                    _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_top10_1_5")
+                    st.session_state[df_state_key] = df
+                    st.session_state.pop(f"pa1_confirmed_{idx}", None)
+                    st.session_state.pop(cache_key, None)
+                    st.session_state[idx_state_key] = _next_qualifying_idx(qualifying_positions, idx, n)
+                    st.rerun()
             elif is_uncodable:
                 df.at[idx, "Brak_mozliwosci_zakodowania"] = "Tak"
                 if uzasadnienie_top10.strip():
@@ -2187,6 +2288,8 @@ def render_pa_top10_step(df, idx: int, row, prefix: str, df_state_key: str, idx_
                 st.session_state.pop(cache_key, None)
                 st.session_state[idx_state_key] = _next_qualifying_idx(qualifying_positions, idx, n)
                 st.rerun()
+            elif choice is None:
+                st.warning("Wybierz jedną opcję z listy albo wpisz kod ręcznie przed zapisaniem.")
             else:
                 df.at[idx, "ISCO_wybrany"] = chosen_code
                 df.at[idx, "Decyzja_kodera_zawod"] = decyzja_kodera_zawod
@@ -2218,6 +2321,12 @@ def render_pa_top10_step(df, idx: int, row, prefix: str, df_state_key: str, idx_
             st.session_state.pop(cache_key, None)
             st.session_state[idx_state_key] = prev_idx
             st.rerun()
+
+    st.caption("Skrót: Ctrl+Enter (na macOS także Cmd+Enter) zapisuje wybór i przechodzi dalej.")
+    _ctrl_enter_shortcut(
+        handler_key="__paTop10CtrlEnterHandler",
+        fallback_labels=["Zapisz i przejdź dalej"],
+    )
 
     st.write("")
     if st.button(
@@ -2498,6 +2607,34 @@ def _cancel_cascade(idx: int):
     st.session_state.pop(f"cascade_digits_{idx}", None)
 
 
+def _cascade_save_direct_code(
+    df,
+    idx: int,
+    final_code: str,
+    target: str,
+    uzasadnienie: str,
+    df_state_key: str,
+    idx_state_key: str,
+    qualifying_positions: list[int],
+) -> None:
+    """Zapisuje pełny kod wpisany ręcznie w trakcie kodowania kaskadowego
+    (pomijając pozostałe, jeszcze nieprzebyte kroki kaskady) i przechodzi
+    do następnego kwalifikującego się przypadku. Analogiczne do
+    _manual_save_code używanego w Metodzie A."""
+    for level, digit in enumerate(final_code, start=1):
+        df.at[idx, f"ISCO_poziom{level}"] = digit
+    df.at[idx, "ISCO_PRED"] = final_code
+    df.at[idx, "ISCO_wybrany"] = final_code
+    df.at[idx, "Kodowany_podmiot"] = target
+    df.at[idx, "Brak_mozliwosci_zakodowania"] = None
+    if uzasadnienie.strip():
+        df.at[idx, "Uzasadnienie_finalne"] = uzasadnienie.strip()
+    _save_respondent_meta(df, idx)
+    st.session_state[df_state_key] = df
+    _cancel_cascade(idx)
+    st.session_state[idx_state_key] = _next_qualifying_idx(qualifying_positions, idx, len(df))
+
+
 def _mark_first_interaction(idx: int):
     """Callback (on_change) na widgecie radio z kandydatami - zapisuje moment
     PIERWSZEGO dotknięcia listy kandydatów przez kodera (proxy na namysł).
@@ -2638,6 +2775,7 @@ def render_cascade_step(df, idx: int, row, df_state_key: str = "hitl_df", idx_st
         selected_vars = []
         uzasadnienie = ""
         ai_helpfulness = None
+        choice = None
         is_no_determination = False
         is_uncodable = False
         chosen_code = None
@@ -2645,6 +2783,7 @@ def render_cascade_step(df, idx: int, row, df_state_key: str = "hitl_df", idx_st
         choice = st.radio(
             "Wybierz kod pasujący do tego kroku",
             options=options,
+            index=None,
             key=f"cascade_choice_{idx}_{level}_{prefix}",
             on_change=_mark_first_interaction,
             args=(idx,),
@@ -2652,7 +2791,10 @@ def render_cascade_step(df, idx: int, row, df_state_key: str = "hitl_df", idx_st
         is_no_determination = choice == NO_DETERMINATION_OPTION
         is_uncodable = show_no_code and choice == NO_CODE_OPTION
 
-        if is_no_determination or is_uncodable:
+        if choice is None:
+            chosen_code = None
+            chosen_title = None
+        elif is_no_determination or is_uncodable:
             chosen_code = None
             chosen_title = None
         else:
@@ -2719,6 +2861,40 @@ def render_cascade_step(df, idx: int, row, df_state_key: str = "hitl_df", idx_st
             uzasadnienie = ""
             ai_helpfulness = None
 
+    st.markdown("**Lub wpisz od razu pełny, 4-cyfrowy kod ISCO-08:**")
+    direct_code = st.text_input(
+        "Pełny kod ISCO-08",
+        value="",
+        max_chars=4,
+        placeholder="",
+        key=f"cascade_direct_code_{idx}",
+        label_visibility="collapsed",
+    ).strip()
+    direct_uzasadnienie = st.text_area(
+        "Uzasadnienie / komentarz do finalnej decyzji (opcjonalnie)",
+        key=f"cascade_direct_uzasadnienie_{idx}_{level}_{prefix}",
+        height=70,
+    )
+    valid_final_codes = set(load_embeddings_level(4)[3])
+    if st.button(
+        "Zapisz pełny kod i przejdź dalej",
+        type="primary",
+        use_container_width=True,
+        key=f"cascade_direct_save_{idx}",
+    ):
+        if not (len(direct_code) == 4 and direct_code.isdigit()):
+            st.warning("Wpisz 4 cyfry kodu ISCO-08.")
+        elif direct_code not in valid_final_codes:
+            st.warning("Podany kod nie występuje na liście kodów ISCO-08.")
+        else:
+            _cascade_save_direct_code(
+                df, idx, direct_code, target, direct_uzasadnienie,
+                df_state_key, idx_state_key, qualifying_positions,
+            )
+            st.rerun()
+
+    st.divider()
+
     col_back, col_next, col_cancel = st.columns(3)
 
     with col_back:
@@ -2741,51 +2917,36 @@ def render_cascade_step(df, idx: int, row, df_state_key: str = "hitl_df", idx_st
         else:
             next_label = "Dalej →"
         if options and st.button(next_label, type="primary", use_container_width=True, key=f"cascade_next_{idx}"):
-            df.at[idx, f"ISCO_poziom{level}_zmienne"] = ", ".join(selected_vars) if selected_vars else None
-            rank, score = _get_rank_and_score(candidates, chosen_code)
-            df.at[idx, f"ISCO_poziom{level}_ranking_pozycja"] = rank
-            df.at[idx, f"ISCO_poziom{level}_score"] = score
-            if show_uzasadnienie and uzasadnienie:
-                df.at[idx, "Uzasadnienie_finalne"] = uzasadnienie.strip()
-
-            # UWAGA: zaznaczenie kolumn w tabeli "Dane respondenta" resetuje się
-            # samo przy przejściu na kolejny poziom kaskady, bo klucz widgetu
-            # (_resp_table_key) zależy od aktualnego cascade_step_{idx} - nowy
-            # poziom = zupełnie nowy widget, bez wcześniejszego zaznaczenia.
-
-            if is_uncodable:
-                # Koder jednoznacznie stwierdził, że nie da się zakodować tej
-                # osoby do żadnego kodu ISCO-08 - nie wypełniamy cyfr zerami
-                # (to celowo inne od "brak możliwości ustalenia" na dalszych
-                # krokach), tylko oznaczamy przypadek i przechodzimy dalej.
-                df.at[idx, "Brak_mozliwosci_zakodowania"] = "Tak"
-                df.at[idx, "Kodowany_podmiot"] = target
-                _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_kaskadowo_1_5")
-                st.session_state[df_state_key] = df
-                _cancel_cascade(idx)
-                st.session_state[idx_state_key] = _next_qualifying_idx(qualifying_positions, idx, n)
-                st.rerun()
-            elif is_no_determination:
-                fill_count = 4 - len(digits)
-                digits.extend(["0"] * fill_count)
-                final_code = "".join(digits)
-                df.at[idx, "ISCO_poziom1"] = digits[0]
-                df.at[idx, "ISCO_poziom2"] = digits[1]
-                df.at[idx, "ISCO_poziom3"] = digits[2]
-                df.at[idx, "ISCO_poziom4"] = digits[3]
-                df.at[idx, "ISCO_PRED"] = final_code
-                df.at[idx, "ISCO_wybrany"] = final_code
-                df.at[idx, "Kodowany_podmiot"] = target
-                _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_kaskadowo_1_5")
-                st.session_state[df_state_key] = df
-                _cancel_cascade(idx)
-                st.session_state[idx_state_key] = _next_qualifying_idx(qualifying_positions, idx, n)
-                st.rerun()
+            if choice is None:
+                st.warning("Wybierz jedną opcję przed przejściem dalej.")
             else:
-                new_digit = chosen_code[-1]
-                digits.append(new_digit)
+                df.at[idx, f"ISCO_poziom{level}_zmienne"] = ", ".join(selected_vars) if selected_vars else None
+                rank, score = _get_rank_and_score(candidates, chosen_code)
+                df.at[idx, f"ISCO_poziom{level}_ranking_pozycja"] = rank
+                df.at[idx, f"ISCO_poziom{level}_score"] = score
+                if show_uzasadnienie and uzasadnienie:
+                    df.at[idx, "Uzasadnienie_finalne"] = uzasadnienie.strip()
 
-                if level == 4:
+                # UWAGA: zaznaczenie kolumn w tabeli "Dane respondenta" resetuje się
+                # samo przy przejściu na kolejny poziom kaskady, bo klucz widgetu
+                # (_resp_table_key) zależy od aktualnego cascade_step_{idx} - nowy
+                # poziom = zupełnie nowy widget, bez wcześniejszego zaznaczenia.
+
+                if is_uncodable:
+                    # Koder jednoznacznie stwierdził, że nie da się zakodować tej
+                    # osoby do żadnego kodu ISCO-08 - nie wypełniamy cyfr zerami
+                    # (to celowo inne od "brak możliwości ustalenia" na dalszych
+                    # krokach), tylko oznaczamy przypadek i przechodzimy dalej.
+                    df.at[idx, "Brak_mozliwosci_zakodowania"] = "Tak"
+                    df.at[idx, "Kodowany_podmiot"] = target
+                    _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_kaskadowo_1_5")
+                    st.session_state[df_state_key] = df
+                    _cancel_cascade(idx)
+                    st.session_state[idx_state_key] = _next_qualifying_idx(qualifying_positions, idx, n)
+                    st.rerun()
+                elif is_no_determination:
+                    fill_count = 4 - len(digits)
+                    digits.extend(["0"] * fill_count)
                     final_code = "".join(digits)
                     df.at[idx, "ISCO_poziom1"] = digits[0]
                     df.at[idx, "ISCO_poziom2"] = digits[1]
@@ -2800,9 +2961,39 @@ def render_cascade_step(df, idx: int, row, df_state_key: str = "hitl_df", idx_st
                     st.session_state[idx_state_key] = _next_qualifying_idx(qualifying_positions, idx, n)
                     st.rerun()
                 else:
-                    st.session_state[df_state_key] = df
-                    st.session_state[f"cascade_step_{idx}"] = level + 1
-                    st.rerun()
+                    new_digit = chosen_code[-1]
+                    digits.append(new_digit)
+
+                    if level == 4:
+                        final_code = "".join(digits)
+                        df.at[idx, "ISCO_poziom1"] = digits[0]
+                        df.at[idx, "ISCO_poziom2"] = digits[1]
+                        df.at[idx, "ISCO_poziom3"] = digits[2]
+                        df.at[idx, "ISCO_poziom4"] = digits[3]
+                        df.at[idx, "ISCO_PRED"] = final_code
+                        df.at[idx, "ISCO_wybrany"] = final_code
+                        df.at[idx, "Kodowany_podmiot"] = target
+                        _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_kaskadowo_1_5")
+                        st.session_state[df_state_key] = df
+                        _cancel_cascade(idx)
+                        st.session_state[idx_state_key] = _next_qualifying_idx(qualifying_positions, idx, n)
+                        st.rerun()
+                    else:
+                        st.session_state[df_state_key] = df
+                        st.session_state[f"cascade_step_{idx}"] = level + 1
+                        st.rerun()
+
+    st.caption("Skrót: Ctrl+Enter (na macOS także Cmd+Enter) uruchamia główny przycisk bieżącego kroku.")
+    _ctrl_enter_shortcut(
+        handler_key="__cascadeCtrlEnterHandler",
+        fallback_labels=[
+            "Zapisz (brak możliwości zakodowania) i przejdź dalej",
+            "Zatwierdź kod finalny",
+            "Dalej →",
+        ],
+        direct_input_aria_label="Pełny kod ISCO-08",
+        direct_save_label="Zapisz pełny kod i przejdź dalej",
+    )
 
 
 @st.dialog("Szczegóły zmiennej")
@@ -3172,15 +3363,14 @@ def render_classify_hitl():
 
     ranking = st.session_state[cache_key]
 
-    NO_MATCH_OPTION = "Brak poprawnego kodu (decyzja kodera)"
     NO_CODE_OPTION = "Brak możliwości zakodowania do kodu ISCO-08 (przejście do następnej osoby)"
     options = [_format_candidate_label(r.isco_code, r.title_pl, getattr(r, "title_en", ""), r.score) for r in ranking.itertuples()]
-    options.append(NO_MATCH_OPTION)
     options.append(NO_CODE_OPTION)
 
     choice = st.radio(
         "Wybierz właściwy kod ISCO-08",
         options=options,
+        index=None,
         key=f"hitl_choice_{idx}",
         on_change=_mark_first_interaction,
         args=(idx,),
@@ -3188,24 +3378,11 @@ def render_classify_hitl():
 
     decyzja_kodera_zawod = None
     decyzja_kodera_notatka = None
-    decyzja_kodera_kod = ""
     is_uncodable = choice == NO_CODE_OPTION
 
-    if choice == NO_MATCH_OPTION:
+    if choice is None:
         chosen_code = None
         chosen_title = None
-        decyzja_kodera_kod = st.text_input(
-            "Proszę wpisać poprawny kod ISCO-08",
-            key=f"hitl_manual_kod_{idx}",
-            max_chars=4,
-        )
-        decyzja_kodera_notatka = st.text_area(
-            "Notatka - proszę opisać, o co chodzi w tym przypadku",
-            key=f"hitl_manual_notatka_{idx}",
-            height=80,
-        )
-        if decyzja_kodera_kod.strip().isdigit() and len(decyzja_kodera_kod.strip()) == 4:
-            chosen_code = decyzja_kodera_kod.strip()
     elif is_uncodable:
         chosen_code = None
         chosen_title = None
@@ -3225,17 +3402,50 @@ def render_classify_hitl():
     # Opcjonalna notatka do wyboru - dostępna zawsze, niezależnie od tego, czy
     # koder wybrał jeden z 10 dopasowanych kodów, czy "brak poprawnego kodu"
     # (na wzór pola "Uzasadnienie / komentarz" z trybu kaskadowego).
+    st.markdown("**Lub wpisz od razu pełny, 4-cyfrowy kod ISCO-08:**")
+    direct_code = st.text_input(
+        "Pełny kod ISCO-08",
+        value="",
+        max_chars=4,
+        placeholder="",
+        key=f"hitl_direct_code_{idx}",
+        label_visibility="collapsed",
+    ).strip()
+
     uzasadnienie_top10 = st.text_area(
         "Uzasadnienie / komentarz do wyboru (opcjonalnie)",
         key=f"hitl_uzasadnienie_{idx}",
         height=70,
     )
 
+    valid_final_codes = set(load_embeddings_level(4)[3])
+
     col_btn1, col_btn2 = st.columns(2)
     with col_btn1:
-        if st.button("Zapisz wybór i przejdź dalej", use_container_width=True):
-            if choice == NO_MATCH_OPTION and not chosen_code:
-                st.warning("Proszę wpisać poprawny, 4-cyfrowy kod ISCO-08 przed zapisaniem.")
+        if st.button("Zapisz i przejdź dalej", type="primary", use_container_width=True):
+            if direct_code:
+                # Ręcznie wpisany kod ma pierwszeństwo przed zaznaczeniem na liście
+                # radio - koder mógł zaznaczyć jakąś opcję wcześniej, a potem
+                # zmienić zdanie i wpisać kod bezpośrednio.
+                if not (len(direct_code) == 4 and direct_code.isdigit()):
+                    st.warning("Wpisz 4 cyfry kodu ISCO-08.")
+                elif direct_code not in valid_final_codes:
+                    st.warning("Podany kod nie występuje na liście kodów ISCO-08.")
+                else:
+                    df.at[idx, "ISCO_wybrany"] = direct_code
+                    df.at[idx, "ISCO_poziom1"] = direct_code[0]
+                    df.at[idx, "ISCO_poziom2"] = direct_code[1]
+                    df.at[idx, "ISCO_poziom3"] = direct_code[2]
+                    df.at[idx, "ISCO_poziom4"] = direct_code[3]
+                    df.at[idx, "ISCO_PRED"] = direct_code
+                    if uzasadnienie_top10.strip():
+                        df.at[idx, "Uzasadnienie_finalne"] = uzasadnienie_top10.strip()
+                    df.at[idx, "Brak_mozliwosci_zakodowania"] = None
+                    df.at[idx, "Kodowany_podmiot"] = target
+                    _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_top10_1_5")
+                    st.session_state["hitl_df"] = df
+                    st.session_state["hitl_idx"] = _next_qualifying_idx(qualifying_positions, idx, n)
+                    st.rerun()
             elif is_uncodable:
                 df.at[idx, "Brak_mozliwosci_zakodowania"] = "Tak"
                 if uzasadnienie_top10.strip():
@@ -3245,6 +3455,8 @@ def render_classify_hitl():
                 st.session_state["hitl_df"] = df
                 st.session_state["hitl_idx"] = _next_qualifying_idx(qualifying_positions, idx, n)
                 st.rerun()
+            elif choice is None:
+                st.warning("Wybierz jedną opcję z listy albo wpisz kod ręcznie przed zapisaniem.")
             else:
                 df.at[idx, "ISCO_wybrany"] = chosen_code
                 df.at[idx, "Decyzja_kodera_zawod"] = decyzja_kodera_zawod
@@ -3266,6 +3478,12 @@ def render_classify_hitl():
             st.session_state[f"hitl_wracal_{prev_idx}"] = True
             st.session_state["hitl_idx"] = prev_idx
             st.rerun()
+
+    st.caption("Skrót: Ctrl+Enter (na macOS także Cmd+Enter) zapisuje wybór i przechodzi dalej.")
+    _ctrl_enter_shortcut(
+        handler_key="__hitlCtrlEnterHandler",
+        fallback_labels=["Zapisz i przejdź dalej"],
+    )
 
     st.write("")
     if st.button(
