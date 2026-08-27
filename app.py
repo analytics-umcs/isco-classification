@@ -26,12 +26,74 @@ APP_DIR = Path(__file__).resolve().parent
 # ============================================================
 # KONFIGURACJA STRONY
 # ============================================================
+def _translate_file_uploader_ui() -> None:
+    """Podmienia domyślne (angielskie) napisy widgetu st.file_uploader na
+    polskie - Streamlit nie oferuje natywnej lokalizacji tego widgetu.
+    Robione przez JS (ten sam mechanizm co _ctrl_enter_shortcut niżej -
+    window.parent.document). Przeszukuje CAŁY dokument (a nie jeden konkretny
+    data-testid) - selektory Streamlita zmieniają się między wersjami, więc
+    poleganie na jednym z nich okazało się zawodne. Dodatkowo próbuje
+    kilkukrotnie w krótkich odstępach (setInterval) na wypadek, gdyby widget
+    wyrenderował się dopiero chwilę po tym wywołaniu, a MutationObserver łapie
+    uploadery pojawiające się później (np. po przełączeniu trybu
+    Respondent/Partner albo zmianie strony)."""
+    components.html(
+        """
+        <script>
+        const doc = window.parent.document;
+        const exactTranslations = {
+            'Drag and drop file here': 'Wczytaj plik',
+            'Browse files': 'Przeglądaj pliki',
+        };
+        function translateNode(node) {
+            if (node.nodeType === Node.TEXT_NODE) {
+                const original = node.textContent;
+                const trimmed = original.trim();
+                if (!trimmed) return;
+                if (exactTranslations[trimmed]) {
+                    node.textContent = original.replace(trimmed, exactTranslations[trimmed]);
+                    return;
+                }
+                const limitMatch = trimmed.match(/^Limit (\\S+) per file(.*)$/);
+                if (limitMatch) {
+                    node.textContent = original.replace(trimmed, `Limit ${limitMatch[1]} na plik${limitMatch[2]}`);
+                }
+            } else if (node.childNodes && node.childNodes.length) {
+                node.childNodes.forEach(translateNode);
+            }
+        }
+        function translateAll() {
+            translateNode(doc.body);
+        }
+        translateAll();
+        if (window.parent.__iscoUploaderInterval) {
+            clearInterval(window.parent.__iscoUploaderInterval);
+        }
+        let ticks = 0;
+        window.parent.__iscoUploaderInterval = setInterval(() => {
+            translateAll();
+            ticks += 1;
+            if (ticks > 30) {
+                clearInterval(window.parent.__iscoUploaderInterval);
+            }
+        }, 250);
+        if (!window.parent.__iscoUploaderObserver) {
+            window.parent.__iscoUploaderObserver = new MutationObserver(translateAll);
+            window.parent.__iscoUploaderObserver.observe(doc.body, {childList: true, subtree: true});
+        }
+        </script>
+        """,
+        height=0,
+    )
+
+
 st.set_page_config(
     page_title="Klasyfikacja zawodów ISCO-08",
     page_icon="🧭",
     layout="wide",  # zmienione z "centered" - więcej miejsca poziomego, żeby długie nazwy
     # zawodów w liście kandydatów rzadziej wymagały skracania (patrz MAX_LABEL_LINE_LEN)
 )
+_translate_file_uploader_ui()
 
 EMB_DIR = APP_DIR / "isco_embeddings" / "level_4"  # pełna baza 436 kodów (poziom 4) - używana w modułach 1 i 2
 MODEL_NAME = "qwen3-embedding:8b"  # lokalnie przez Ollama, brak API
@@ -83,6 +145,12 @@ QUESTIONNAIRE_DB_PATH = Path(
 CODING_DB_PATH = Path(
     os.environ.get("CODING_DB_PATH", APP_DIR / "data" / "coding_progress.sqlite3")
 )
+# Cache roboczych df (per użytkownik) na dysku - pozwala odtworzyć wczytany
+# plik i pozycję kodowania po odświeżeniu strony (F5), kiedy st.file_uploader
+# i st.session_state tracą swój stan (patrz _persist_df / _load_df_cache niżej).
+SESSION_CACHE_DIR = Path(
+    os.environ.get("SESSION_CACHE_DIR", APP_DIR / "data" / "session_cache")
+)
 
 # Mapowanie klucza stanu sesji (df_state_key) na etykietę wariantu metodologicznego
 # używaną w ewidencji postępu kodowania i w pliku przydziału (Status.csv).
@@ -107,6 +175,7 @@ ASSET_DIR = APP_DIR / "assets"
 LOGO_PATHS = {
     "UMCS": ASSET_DIR / "logoc.png",
     "IFiS PAN": ASSET_DIR / "ifis.jpeg",
+    "IFiS PAN Łódź": ASSET_DIR / "lodz.png",
     "ESS": ASSET_DIR / "ess_eric_logo.jpg",
 }
 
@@ -245,6 +314,9 @@ CUSTOM_CSS = f"""
     max-height: 143px;
 }}
 .logo-header__item--ifis img {{
+    max-height: 164px;
+}}
+.logo-header__item--lodz img {{
     max-height: 164px;
 }}
 .logo-header__item--ess img {{
@@ -403,7 +475,8 @@ div[class*="st-key-questionnaire_table_"] div[data-testid="stColumn"]:last-child
         padding: 0.2rem 0 0.9rem 0;
     }}
     .logo-header__item img,
-    .logo-header__item--ifis img {{
+    .logo-header__item--ifis img,
+    .logo-header__item--lodz img {{
         max-height: 116px;
     }}
     .logo-header__item--umcs img {{
@@ -440,6 +513,9 @@ def render_logo_header():
             <div class="logo-header__item logo-header__item--ifis">
                 <img src="{_asset_data_uri(LOGO_PATHS["IFiS PAN"])}" alt="IFiS PAN">
             </div>
+            <div class="logo-header__item logo-header__item--lodz">
+                <img src="{_asset_data_uri(LOGO_PATHS["IFiS PAN Łódź"])}" alt="IFiS PAN Łódź">
+            </div>
             <div class="logo-header__item logo-header__item--ess">
                 <img src="{_asset_data_uri(LOGO_PATHS["ESS"])}" alt="ESS">
             </div>
@@ -455,12 +531,18 @@ def _valid_login(username: str, password: str) -> bool:
 
 
 def render_helpfulness_scale(label: str, key: str) -> int:
-    """Render the standard Streamlit radio scale, spread across the row via CSS."""
+    """Render the standard Streamlit radio scale, spread across the row via CSS.
+
+    `index` jest podawany TYLKO gdy klucz nie ma jeszcze wartości w
+    session_state - inaczej Streamlit ostrzega (i teoretycznie mógłby się
+    pogubić), że wartość domyślna i session_state ustawiają widget
+    jednocześnie. Dotyczy to zwłaszcza przypadków, gdzie wartość została
+    wcześniej odtworzona z zapisanego szkicu (patrz _restore_widget_drafts)."""
     with st.container(key=f"{key}_spread"):
         return st.radio(
             label,
             options=[1, 2, 3, 4, 5],
-            index=2,
+            index=None if key in st.session_state else 2,
             horizontal=True,
             key=key,
         )
@@ -491,6 +573,9 @@ def render_login():
         if _valid_login(username.strip(), password):
             st.session_state.authenticated = True
             st.session_state.username = username.strip()
+            # Zapisujemy użytkownika w URL, żeby require_login mógł go odtworzyć
+            # po odświeżeniu strony bez ponownego logowania (patrz require_login).
+            st.query_params["u"] = username.strip()
             st.rerun()
         else:
             st.error("Nieprawidłowy użytkownik lub hasło.")
@@ -499,8 +584,152 @@ def render_login():
 
 def require_login():
     if not st.session_state.get("authenticated", False):
-        render_login()
-        st.stop()
+        # Po odświeżeniu strony (F5) st.session_state jest puste, ale identyfikator
+        # użytkownika w URL (?u=...) przetrwa - odtwarzamy zalogowanie na jego
+        # podstawie, żeby koder nie musiał wpisywać hasła po każdym odświeżeniu.
+        qp_user = st.query_params.get("u")
+        if qp_user in APP_USERS:
+            st.session_state.authenticated = True
+            st.session_state.username = qp_user
+        else:
+            render_login()
+            st.stop()
+
+
+def _session_cache_path(df_state_key: str) -> Path:
+    """Ścieżka do pliku cache dla danego modułu (manual_df / hitl_df / hitl1d_df)
+    i zalogowanego użytkownika - jeden plik na kombinację user+moduł."""
+    username = st.session_state.get("username", "anon")
+    SESSION_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    return SESSION_CACHE_DIR / f"{username}_{df_state_key}.pkl"
+
+
+def _persist_df(df_state_key: str, df: pd.DataFrame, source_name: Optional[str] = None) -> None:
+    """Zapisuje df jednocześnie do session_state (jak dotychczas) i na dysk,
+    żeby przetrwał odświeżenie strony. Wywołuj zamiast gołego
+    `st.session_state[df_state_key] = df` wszędzie tam, gdzie df jest
+    aktualizowany po zapisaniu odpowiedzi kodera."""
+    st.session_state[df_state_key] = df
+    if source_name is None:
+        source_key = df_state_key.replace("_df", "_source")
+        source_name = st.session_state.get(source_key, "")
+    try:
+        path = _session_cache_path(df_state_key)
+        df.to_pickle(path)
+        path.with_suffix(".meta").write_text(source_name, encoding="utf-8")
+    except OSError:
+        # Cache na dysku to funkcja pomocnicza (odtwarzanie po F5) - jeśli zapis
+        # się nie uda (np. brak miejsca), nie chcemy przerywać właściwego
+        # zapisu odpowiedzi kodera, który już trafił do CODING_DB_PATH.
+        pass
+
+
+def _load_df_cache(df_state_key: str) -> Tuple[Optional[pd.DataFrame], Optional[str]]:
+    """Odczytuje zapisany wcześniej df dla bieżącego użytkownika, jeśli istnieje."""
+    path = _session_cache_path(df_state_key)
+    meta_path = path.with_suffix(".meta")
+    if path.exists() and meta_path.exists():
+        try:
+            return pd.read_pickle(path), meta_path.read_text(encoding="utf-8")
+        except (OSError, ValueError, EOFError):
+            return None, None
+    return None, None
+
+
+# Krótkie nazwy parametrów URL dla poszczególnych idx_state_key - identyczny
+# mechanizm jak przy zapamiętywaniu zalogowanego użytkownika (?u=) i aktualnej
+# strony (?p=), tylko dla dokładnej pozycji kodowania w danym module.
+IDX_QUERY_PARAM = {
+    "manual_idx": "mi",
+    "hitl_idx": "hi",
+    "hitl1d_idx": "h1i",
+}
+FRONTIER_QUERY_PARAM = {
+    "manual_idx": "mf",
+    "hitl_idx": "hf",
+    "hitl1d_idx": "h1f",
+}
+
+
+def _set_idx(idx_state_key: str, value: int) -> None:
+    """Ustawia bieżącą pozycję kodowania jednocześnie w session_state i w URL,
+    żeby DOKŁADNA pozycja (np. przypadek nr 99) przetrwała odświeżenie strony
+    (F5) - zamiast cofać się do pierwszego nieukończonego przypadku, co mogłoby
+    być inną pozycją, jeśli koder wcześniej przeskakiwał między przypadkami
+    (patrz _render_case_jumper). Dodatkowo śledzi "frontier" - najdalej
+    osiągniętą pozycję w danym module - używane przez _next_idx_after_save,
+    żeby po edycji wcześniejszego przypadku wrócić tam, gdzie koder naprawdę
+    skończył, zamiast przesuwać się tylko o jeden dalej od edytowanego miejsca.
+    Używaj zamiast gołego `st.session_state[idx_state_key] = wartość`."""
+    st.session_state[idx_state_key] = value
+    frontier_key = _frontier_key(idx_state_key)
+    frontier = max(value, st.session_state.get(frontier_key, value))
+    st.session_state[frontier_key] = frontier
+    param = IDX_QUERY_PARAM.get(idx_state_key)
+    if param:
+        st.query_params[param] = str(value)
+    frontier_param = FRONTIER_QUERY_PARAM.get(idx_state_key)
+    if frontier_param:
+        st.query_params[frontier_param] = str(frontier)
+
+
+def _frontier_key(idx_state_key: str) -> str:
+    return f"{idx_state_key}_frontier"
+
+
+def _restore_frontier_from_query(idx_state_key: str, fallback: int) -> int:
+    """Odczytuje zapamiętaną najdalej osiągniętą pozycję z URL (patrz
+    _set_idx) po odświeżeniu strony. Nigdy nie zwraca wartości mniejszej niż
+    `fallback`, żeby po refreshu frontier nie "cofnął się" poniżej pozycji,
+    do której i tak wracamy (np. pierwszy nieukończony przypadek)."""
+    param = FRONTIER_QUERY_PARAM.get(idx_state_key)
+    if not param:
+        return fallback
+    raw = st.query_params.get(param)
+    if raw is None:
+        return fallback
+    try:
+        return max(int(raw), fallback)
+    except ValueError:
+        return fallback
+
+
+def _next_idx_after_save(qualifying_positions: list[int], idx: int, idx_state_key: str, n: int) -> int:
+    """Po zapisaniu odpowiedzi decyduje, dokąd przejść dalej.
+
+    Jeśli koder edytował przypadek PRZED swoją najdalej osiągniętą pozycją -
+    czyli wrócił, żeby coś sprawdzić albo poprawić (patrz _render_case_jumper
+    i przyciski "Poprzedni") - po zapisaniu WRACA na tę najdalszą pozycję,
+    zamiast przesuwać się tylko o jeden przypadek od właśnie edytowanego
+    miejsca (co wyglądałoby jak "nic się nie zapisało", bo koder gubił swoje
+    właściwe miejsce w pliku). W przeciwnym razie - normalny postęp "do przodu"
+    - przechodzi po prostu do kolejnego kwalifikującego się przypadku, jak
+    dotychczas."""
+    next_seq = _next_qualifying_idx(qualifying_positions, idx, n)
+    frontier = st.session_state.get(_frontier_key(idx_state_key), idx)
+    if idx < frontier:
+        return frontier
+    return next_seq
+
+
+def _restore_idx_from_query(idx_state_key: str, fallback: int, n: int) -> int:
+    """Odczytuje zapamiętaną pozycję z URL (patrz _set_idx) po odświeżeniu
+    strony. Jeśli parametru brak albo jest spoza zakresu pliku, używa
+    `fallback` (zwykle pierwszy nieukończony przypadek - patrz
+    _first_unfinished_idx)."""
+    param = IDX_QUERY_PARAM.get(idx_state_key)
+    if not param:
+        return fallback
+    raw = st.query_params.get(param)
+    if raw is None:
+        return fallback
+    try:
+        value = int(raw)
+    except ValueError:
+        return fallback
+    if 0 <= value <= n:
+        return value
+    return fallback
 
 
 # ============================================================
@@ -661,15 +890,20 @@ def visible_df_for_mode(df: pd.DataFrame, target: str) -> pd.DataFrame:
     return df[keep_cols]
 
 
+# Ręczne etykiety dla kolumn, których opis w metadanych z pliku ESS (.RData)
+# albo nie istnieje, albo jest zbyt techniczny - nadrzędne wobec var_meta.
+# Działa niezależnie od zawartości pliku ess_var_metadata_pl_*.json.
+COLUMN_LABEL_OVERRIDES = {
+    "B31": "Branża",
+}
+
+
 def _build_column_help(col: str, var_meta: dict) -> Optional[str]:
     """Buduje tekst dymka (tooltip) dla nagłówka kolumny na podstawie metadanych
     zmiennej: etykieta zmiennej + (jeśli jest ich rozsądnie mało) lista etykiet
     wartości. Zwraca None, jeśli brak metadanych dla tej kolumny."""
-    meta = var_meta.get(col)
-    if not meta:
-        return None
-
-    label = meta.get("label", "")
+    meta = var_meta.get(col) or {}
+    label = COLUMN_LABEL_OVERRIDES.get(col, meta.get("label", ""))
     value_labels = meta.get("value_labels", {}) or {}
 
     parts = []
@@ -888,6 +1122,71 @@ def _prev_qualifying_idx(qualifying_positions: list[int], current_idx: int) -> i
     return prev if prev is not None else current_idx
 
 
+def _render_case_jumper(
+    qualifying_positions: list[int],
+    idx: int,
+    idx_state_key: str,
+    key_suffix: str,
+    on_jump=None,
+) -> None:
+    """Pozwala przeskoczyć do DOWOLNEGO przypadku na liście kwalifikujących się
+    wierszy (patrz _qualifying_positions), a nie tylko o jeden w przód/w tył.
+
+    Przeskoczenie nie kasuje żadnych wcześniej zapisanych kodów - każdy
+    przypadek trzyma swoje dane niezależnie w wierszu df (df.at[idx, ...]),
+    więc przejście gdzie indziej i powrót nic nie nadpisuje. Dzięki temu można
+    np. wrócić 2 przypadki wstecz, żeby coś sprawdzić, albo pominąć trudniejszy
+    przypadek i najpierw zrobić łatwiejsze dalej na liście, a wrócić do niego
+    później.
+
+    `on_jump`, jeśli podane, jest wywoływane z docelowym idx PRZED zmianą
+    st.session_state[idx_state_key] - używane np. w module ręcznym do
+    zresetowania wizarda kaskady dla docelowego przypadku (patrz
+    _manual_reset_idx)."""
+    total = len(qualifying_positions)
+    if total <= 1:
+        return
+    current_rank = qualifying_positions.index(idx) + 1 if idx in qualifying_positions else 1
+    with st.expander(f"Przejdź do przypadku (aktualnie {current_rank} z {total})"):
+        col_num, col_btn = st.columns([3, 1])
+        with col_num:
+            target_rank = st.number_input(
+                "Numer przypadku",
+                min_value=1,
+                max_value=total,
+                value=current_rank,
+                step=1,
+                key=f"jump_rank_{key_suffix}",
+                label_visibility="collapsed",
+            )
+        with col_btn:
+            if st.button("Przejdź", key=f"jump_btn_{key_suffix}", use_container_width=True):
+                target_idx = qualifying_positions[int(target_rank) - 1]
+                if on_jump is not None:
+                    on_jump(target_idx)
+                _set_idx(idx_state_key, target_idx)
+                st.rerun()
+
+
+def _render_next_case_button(qualifying_positions: list[int], idx: int, idx_state_key: str, key_suffix: str, on_jump=None) -> bool:
+    """Przycisk 'Przejdź do kolejnego przypadku' - przesuwa o jedną pozycję do
+    przodu na liście kwalifikujących się wierszy, bez zapisywania niczego
+    (czysta nawigacja, jak _render_case_jumper). Umieszczany OBOK przycisku
+    'Poprzedni'/'Wróć do poprzedniego przypadku', a nie w schowanym panelu, dla
+    szybkiego, jednoklikowego przeglądu do przodu. Zwraca True, jeśli przycisk
+    został kliknięty (wtedy wywołujący powinien od razu zrobić st.rerun())."""
+    current_rank = qualifying_positions.index(idx) + 1 if idx in qualifying_positions else 0
+    if current_rank >= len(qualifying_positions):
+        return False
+    if st.button("Przejdź do kolejnego przypadku →", key=f"jump_next_{key_suffix}", use_container_width=True):
+        target_idx = qualifying_positions[current_rank]
+        if on_jump is not None:
+            on_jump(target_idx)
+        _set_idx(idx_state_key, target_idx)
+        return True
+    return False
+
+
 def _qualifying_progress(qualifying_positions: list[int], idx: int, n: int) -> tuple[float, int, int]:
     """Zwraca (ułamek_postępu, aktualna_pozycja_1_indexed, łączna_liczba) do
     wyświetlenia na pasku postępu, licząc WYŁĄCZNIE kwalifikujące się wiersze
@@ -944,6 +1243,28 @@ def _first_unfinished_idx(df: pd.DataFrame, target: str) -> int:
     return int(undecided_positions[0]) if len(undecided_positions) else len(df)
 
 
+def _unfinished_case_numbers(df: pd.DataFrame, target: str, qualifying_positions: list[int]) -> list[int]:
+    """Jak _first_unfinished_idx, ale zwraca numery (rangi 1-based wśród
+    `qualifying_positions`, czyli te same numery co widoczne koderowi w
+    pasku postępu 'X z Y') WSZYSTKICH jeszcze nieukończonych przypadków, a
+    nie tylko pierwszego - używane przy pobieraniu częściowego wyniku, żeby
+    pokazać listę numerów do dokończenia."""
+    qualifies = _qualifying_mask(df, target)
+    if "Kodowany_podmiot" not in df.columns:
+        decided = pd.Series(False, index=df.index)
+    else:
+        decided = df["Kodowany_podmiot"] == target
+        if "ISCO_wybrany" in df.columns:
+            decided = decided & df["ISCO_wybrany"].notna()
+        else:
+            decided = decided & False
+        if "Brak_mozliwosci_zakodowania" in df.columns:
+            decided = decided | ((df["Kodowany_podmiot"] == target) & (df["Brak_mozliwosci_zakodowania"] == "Tak"))
+    decided = decided | (~qualifies)
+    undecided_idx_set = set((~decided).to_numpy().nonzero()[0].tolist())
+    return [rank for rank, pos in enumerate(qualifying_positions, start=1) if pos in undecided_idx_set]
+
+
 def _reset_module_progress(df_state_key: str, idx_state_key: str, df=None, target_mode: Optional[str] = None):
     """Czyści cały postęp kodowania w danym module (wybory, cache klasyfikacji,
     liczniki czasu, stan kaskady, zaznaczenia w tabeli). Używane przy twardym
@@ -970,9 +1291,9 @@ def _reset_module_progress(df_state_key: str, idx_state_key: str, df=None, targe
         if key.startswith(clear_prefixes):
             del st.session_state[key]
     if df is not None and target_mode:
-        st.session_state[idx_state_key] = _first_unfinished_idx(df, target_mode)
+        _set_idx(idx_state_key, _first_unfinished_idx(df, target_mode))
     else:
-        st.session_state[idx_state_key] = 0
+        _set_idx(idx_state_key, 0)
 
 
 def render_mode_selector(df_state_key: str, idx_state_key: str, df, idx: int, n: int) -> str:
@@ -1062,7 +1383,7 @@ def render_mode_selector(df_state_key: str, idx_state_key: str, df, idx: int, n:
                     st.session_state[pending_target_key] = "Respondent"
                 else:
                     st.session_state[mode_key] = "Respondent"
-                    st.session_state[idx_state_key] = _first_unfinished_idx(df, "Respondent")
+                    _set_idx(idx_state_key, _first_unfinished_idx(df, "Respondent"))
                 st.rerun()
     with col_p:
         if st.button(
@@ -1077,7 +1398,7 @@ def render_mode_selector(df_state_key: str, idx_state_key: str, df, idx: int, n:
                     st.session_state[pending_target_key] = "Partner"
                 else:
                     st.session_state[mode_key] = "Partner"
-                    st.session_state[idx_state_key] = _first_unfinished_idx(df, "Partner")
+                    _set_idx(idx_state_key, _first_unfinished_idx(df, "Partner"))
                 st.rerun()
 
     return st.session_state[mode_key]
@@ -1107,10 +1428,8 @@ def build_column_config_for_respondent(row, var_meta: dict) -> dict:
     wszystkich możliwych kategorii)."""
     config = {}
     for col in row.index:
-        meta = var_meta.get(col)
-        if not meta:
-            continue
-        label = meta.get("label", "")
+        meta = var_meta.get(col) or {}
+        label = COLUMN_LABEL_OVERRIDES.get(col, meta.get("label", ""))
         if not label:
             continue
         value_labels = meta.get("value_labels", {}) or {}
@@ -1179,7 +1498,14 @@ def classify(
             }
         )
 
-    ranking = pd.DataFrame(rows).sort_values("score", ascending=False).reset_index(drop=True)
+    columns = ["isco_code", "title_pl", "title_en", "sim_title", "sim_tasks", "sim_synteza", "score"]
+    if not rows:
+        # Żaden kod nie pasuje do podanego prefiksu - pd.DataFrame([]) nie
+        # miałoby kolumny "score", więc sort_values("score") rzuciłby
+        # KeyError. Zwracamy pusty DataFrame z właściwymi kolumnami.
+        return pd.DataFrame(columns=columns)
+
+    ranking = pd.DataFrame(rows, columns=columns).sort_values("score", ascending=False).reset_index(drop=True)
     return ranking.head(top_k)
 
 
@@ -1230,7 +1556,17 @@ def classify_level(
             }
         )
 
-    ranking = pd.DataFrame(rows).sort_values("score", ascending=False).reset_index(drop=True)
+    columns = ["isco_code", "title_pl", "title_en", "sim_title", "sim_tasks", "sim_synteza", "score"]
+    if not rows:
+        # Żaden kod na tym poziomie nie zaczyna się od dotychczas wybranego
+        # prefiksu (ślepy zaułek w kaskadzie) - pd.DataFrame([]) nie miałoby
+        # kolumny "score", więc sort_values("score") rzucałby KeyError.
+        # Zwracamy pusty DataFrame z właściwymi kolumnami - render_cascade_step
+        # obsługuje już ten przypadek (komunikat "Brak kodów ISCO-08
+        # pasujących do wybranego dotychczas prefiksu...").
+        return pd.DataFrame(columns=columns)
+
+    ranking = pd.DataFrame(rows, columns=columns).sort_values("score", ascending=False).reset_index(drop=True)
     return ranking
 
 
@@ -1303,11 +1639,14 @@ def read_csv_robust(uploaded_file) -> pd.DataFrame:
 # STAN SESJI - nawigacja między "stronami"
 # ============================================================
 if "page" not in st.session_state:
-    st.session_state.page = "home"
+    # Po odświeżeniu strony (F5) odtwarzamy ostatnio otwartą "kartę" (metodę)
+    # z parametru URL zamiast zawsze wracać do menu głównego (patrz go_to).
+    st.session_state.page = st.query_params.get("p", "home")
 
 
 def go_to(page_name: str):
     st.session_state.page = page_name
+    st.query_params["p"] = page_name
 
 
 def _questionnaire_csv() -> bytes:
@@ -2098,11 +2437,12 @@ def render_home():
         with st.container(border=True):
             st.markdown(
                 '<div class="module-card-title">Metoda A'
-                '<span class="module-card-sub">kodowanie ręczne</span></div>',
+                '<span class="module-card-sub">Kodowanie ręczne</span></div>',
                 unsafe_allow_html=True,
             )
             if st.button("Otwórz", key="btn_manual", use_container_width=True):
                 go_to("classify_manual")
+                st.rerun()
 
     with col2:
         with st.container(border=True):
@@ -2113,6 +2453,7 @@ def render_home():
             )
             if st.button("Otwórz", key="btn_hitl", use_container_width=True):
                 go_to("classify_hitl")
+                st.rerun()
 
     with col3:
         with st.container(border=True):
@@ -2124,6 +2465,7 @@ def render_home():
             )
             if st.button("Otwórz", key="btn_hitl_1digit", use_container_width=True):
                 go_to("classify_hitl_1digit")
+                st.rerun()
 
 
 # ============================================================
@@ -2144,7 +2486,26 @@ def _manual_level_options(level: int, prefix: str = "") -> list[dict]:
         }
         for code in codes
     ]
-    return options + [{"code": "__NO_MATCH__", "label": "Nic nie pasuje"}]
+    if level > 1:
+        # Poziom 2-4: nie da się ustalić dokładniejszej cyfry, ale kierunek
+        # (poprzednie cyfry) jest znany - dopełniamy resztę zerami i zapisujemy
+        # jako wynik częściowej precyzji (analogicznie do trybu kaskadowego
+        # w module B/C - patrz render_cascade_step / NO_DETERMINATION_OPTION).
+        preview_code = (prefix + "0" * (5 - level))[:4]
+        options.append({
+            "code": "__NO_MATCH__",
+            "label": f"Brak możliwości ustalenia dokładnej cyfry (dopełnij pozostałe cyfry zerami, kod: {preview_code})",
+        })
+    else:
+        # Poziom 1: brak nawet grupy głównej - to prawdziwie niemożliwy do
+        # zakodowania przypadek, nie zapisujemy żadnego kodu (patrz obsługa
+        # "__UNCODABLE__" w render_manual_step) - tak samo jak "Brak możliwości
+        # zakodowania..." w module B/C.
+        options.append({
+            "code": "__UNCODABLE__",
+            "label": "Brak możliwości zakodowania do kodu ISCO-08 (przejście do następnej osoby)",
+        })
+    return options
 
 
 def _init_manual_result_columns(df: pd.DataFrame) -> None:
@@ -2189,6 +2550,34 @@ def _manual_reset_idx(idx: int) -> None:
     st.session_state[f"manual_digits_{idx}"] = []
 
 
+def _manual_save_uncodable(
+    df,
+    idx: int,
+    target: str,
+    uzasadnienie: str,
+    df_state_key: str,
+    idx_state_key: str,
+    qualifying_positions: list[int],
+) -> None:
+    """Zapisuje przypadek jako NIEMOŻLIWY do zakodowania (poziom 1 - brak
+    nawet grupy głównej) - analogicznie do NO_CODE_OPTION w module B/C: nie
+    zapisuje żadnego kodu ISCO, tylko ustawia Brak_mozliwosci_zakodowania i
+    przechodzi do kolejnego przypadku."""
+    df.at[idx, "Brak_mozliwosci_zakodowania"] = "Tak"
+    df.at[idx, "Kodowany_podmiot"] = target
+    if uzasadnienie.strip():
+        df.at[idx, "Uzasadnienie_finalne"] = uzasadnienie.strip()
+        df.at[idx, "Decyzja_kodera_notatka"] = uzasadnienie.strip()
+    else:
+        df.at[idx, "Uzasadnienie_finalne"] = None
+        df.at[idx, "Decyzja_kodera_notatka"] = None
+    _save_respondent_meta(df, idx, df_state_key=df_state_key)
+    _persist_df(df_state_key, df)
+    st.session_state.pop(f"manual_step_{idx}", None)
+    st.session_state.pop(f"manual_digits_{idx}", None)
+    _set_idx(idx_state_key, _next_idx_after_save(qualifying_positions, idx, idx_state_key, len(df)))
+
+
 def _manual_save_code(
     df,
     idx: int,
@@ -2217,10 +2606,10 @@ def _manual_save_code(
         df.at[idx, "Uzasadnienie_finalne"] = None
         df.at[idx, "Decyzja_kodera_notatka"] = None
     _save_respondent_meta(df, idx, df_state_key=df_state_key)
-    st.session_state[df_state_key] = df
+    _persist_df(df_state_key, df)
     st.session_state.pop(f"manual_step_{idx}", None)
     st.session_state.pop(f"manual_digits_{idx}", None)
-    st.session_state[idx_state_key] = _next_qualifying_idx(qualifying_positions, idx, len(df))
+    _set_idx(idx_state_key, _next_idx_after_save(qualifying_positions, idx, idx_state_key, len(df)))
 
 
 def _ctrl_enter_shortcut(
@@ -2260,12 +2649,128 @@ def _ctrl_enter_shortcut(
                 : {fallback_json};
             const buttons = [...doc.querySelectorAll('button')];
             const button = buttons.find((item) => labels.includes(item.innerText.trim()));
-            if (button && !button.disabled) {{
-                event.preventDefault();
-                button.click();
+            if (!button || button.disabled) return;
+            event.preventDefault();
+            const active = doc.activeElement;
+            const clickButton = () => button.click();
+            if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {{
+                // Ctrl+Enter NIE przenosi fokusu poza pole (w przeciwieństwie do
+                // kliknięcia myszą gdzie indziej), a Streamlit wysyła do serwera
+                // właśnie wpisaną wartość pola tekstowego dopiero przy utracie
+                // fokusu (blur) - bez tego serwer mógł jeszcze "widzieć" starą
+                // wartość sprzed edycji (np. z poprzedniego przypadku) w
+                // momencie kliknięcia przycisku. Wymuszamy więc blur i dajemy
+                // Streamlitowi chwilę na przetworzenie synchronizacji, zanim
+                // faktycznie klikniemy przycisk zapisu.
+                active.blur();
+                setTimeout(clickButton, 60);
+            }} else {{
+                clickButton();
             }}
         }};
         doc.addEventListener('keydown', window.parent[handlerKey], true);
+        </script>
+        """,
+        height=0,
+    )
+
+
+def _instant_text_persistence(idx: int, fields: list[tuple[str, str]]) -> None:
+    """Zapisuje treść pól tekstowych (textarea/input) o podanych aria-label do
+    localStorage przeglądarki PRZY KAŻDYM naciśnięciu klawisza ('input'), nie
+    czekając na utratę fokusu jak robi to domyślnie Streamlit (które
+    synchronizuje wartość z serwerem dopiero po kliknięciu poza polem). Dzięki
+    temu tekst przetrwa nawet natychmiastowe odświeżenie strony w trakcie
+    pisania - inaczej niż przy zwykłej synchronizacji Streamlita, gdzie
+    wpisany, ale jeszcze niewysłany tekst ginie bezpowrotnie przy F5.
+
+    `fields` to lista par (aria_label, aktualna_wartość) - aktualna_wartość to
+    to, co Streamlit WŁAŚNIE wyrenderował dla tego przypadku (pusty string dla
+    nigdy niekodowanego przypadku, albo wcześniej zapisany kod/uzasadnienie
+    przy powrocie do już zakodowanego - patrz _seed_direct_code_and_uzasadnienie
+    / _seed_top10_widgets). Przy KAŻDEJ zmianie `idx` skrypt WYMUSZA na polu
+    dokładnie tę wartość - chyba że w localStorage czeka świeższy, jeszcze
+    niezapisany szkic dla TEGO SAMEGO idx (czyli odświeżenie strony w trakcie
+    pisania). Dzięki jawnemu wymuszaniu wartości (a nie tylko jej
+    'dokładaniu', gdy pasuje) pole nie może już zostać z resztką tekstu po
+    poprzednim przypadku - to była przyczyna błędu, w którym ręcznie wpisany
+    kod 'zostawał' w polu przy przejściu do kolejnego, nigdy niekodowanego
+    przypadku."""
+    labels_json = json.dumps([label for label, _ in fields])
+    fields_json = json.dumps([{"label": label, "value": value} for label, value in fields])
+    components.html(
+        f"""
+        <script>
+        (function() {{
+            const doc = window.parent.document;
+            const idx = {idx};
+            const labels = {labels_json};
+            const fields = {fields_json};
+            const STORAGE_KEY = 'isco_draft_v1';
+
+            function loadStore() {{
+                try {{ return JSON.parse(window.parent.localStorage.getItem(STORAGE_KEY) || '{{}}'); }}
+                catch (e) {{ return {{}}; }}
+            }}
+            function saveStore(store) {{
+                try {{ window.parent.localStorage.setItem(STORAGE_KEY, JSON.stringify(store)); }}
+                catch (e) {{}}
+            }}
+            function nativeSet(el, value) {{
+                const proto = el.tagName === 'TEXTAREA'
+                    ? window.parent.HTMLTextAreaElement.prototype
+                    : window.parent.HTMLInputElement.prototype;
+                const setter = Object.getOwnPropertyDescriptor(proto, 'value').set;
+                setter.call(el, value);
+                el.dispatchEvent(new Event('input', {{ bubbles: true }}));
+            }}
+
+            if (!window.parent.__iscoInstantSaveInstalled) {{
+                window.parent.__iscoInstantSaveInstalled = true;
+                doc.addEventListener('input', (event) => {{
+                    const el = event.target;
+                    const label = el.getAttribute && el.getAttribute('aria-label');
+                    if (!label || !window.parent.__iscoTrackedLabels || !window.parent.__iscoTrackedLabels.includes(label)) return;
+                    const store = loadStore();
+                    store[label] = {{ idx: window.parent.__iscoCurrentIdx, value: el.value }};
+                    saveStore(store);
+                }}, true);
+            }}
+            window.parent.__iscoTrackedLabels = labels;
+            window.parent.__iscoCurrentIdx = idx;
+
+            function enforceAll() {{
+                const store = loadStore();
+                fields.forEach(({{label, value}}) => {{
+                    const el = doc.querySelector(`textarea[aria-label="${{label}}"], input[aria-label="${{label}}"]`);
+                    if (!el) return;
+                    // Raz na idx wystarczy - inaczej wymuszalibyśmy tę samą
+                    // wartość przy każdej mutacji DOM, nadpisując na siłę to,
+                    // co koder właśnie wpisuje.
+                    if (el.dataset.iscoIdx === String(idx)) return;
+                    el.dataset.iscoIdx = String(idx);
+                    const draft = store[label];
+                    if (draft && draft.idx === idx && draft.value && draft.value !== value) {{
+                        // Niezapisany jeszcze szkic z tej samej sesji dla TEGO
+                        // SAMEGO przypadku (np. po odświeżeniu F5 w trakcie
+                        // pisania) - ma pierwszeństwo przed wartością z serwera.
+                        nativeSet(el, draft.value);
+                    }} else if (el.value !== value) {{
+                        // W każdym innym wypadku wymuszamy DOKŁADNIE to, co
+                        // Streamlit wyrenderował dla tego przypadku - pusty
+                        // string dla nowego przypadku, żeby żadna resztka
+                        // tekstu z poprzedniego przypadku nie została widoczna.
+                        nativeSet(el, value);
+                    }}
+                }});
+            }}
+            enforceAll();
+            if (window.parent.__iscoInstantSaveObserver) {{
+                window.parent.__iscoInstantSaveObserver.disconnect();
+            }}
+            window.parent.__iscoInstantSaveObserver = new MutationObserver(enforceAll);
+            window.parent.__iscoInstantSaveObserver.observe(doc.body, {{ childList: true, subtree: true }});
+        }})();
         </script>
         """,
         height=0,
@@ -2349,11 +2854,16 @@ def render_manual_step(df, idx: int, row, df_state_key: str = "manual_df", idx_s
     selected_vars = [c for c in clicked_cols if c in source_cols]
 
     _render_selected_vars_caption(row, var_meta, selected_vars)
+    _render_previously_used_vars_caption(df, idx, selected_vars)
 
     st.markdown("**Lub wpisz od razu pełny, 4-cyfrowy kod ISCO-08:**")
+    _seed_direct_code_and_uzasadnienie(
+        df, idx,
+        direct_key=f"manual_direct_code_{idx}",
+        uzasadnienie_key=f"manual_uzasadnienie_{idx}",
+    )
     direct_code = st.text_input(
         "Pełny kod ISCO-08",
-        value="",
         max_chars=4,
         placeholder="",
         key=f"manual_direct_code_{idx}",
@@ -2362,7 +2872,7 @@ def render_manual_step(df, idx: int, row, df_state_key: str = "manual_df", idx_s
 
     uzasadnienie = st.text_area(
         "Uzasadnienie / komentarz do finalnej decyzji (opcjonalnie)",
-        key=f"manual_uzasadnienie_{idx}_{level}_{prefix}",
+        key=f"manual_uzasadnienie_{idx}",
         height=70,
     )
 
@@ -2370,22 +2880,6 @@ def render_manual_step(df, idx: int, row, df_state_key: str = "manual_df", idx_s
     valid_level1_codes = set(load_embeddings_level(1)[3])
     valid_level2_codes = set(load_embeddings_level(2)[3])
     valid_level3_codes = set(load_embeddings_level(3)[3])
-
-    def _direct_code_is_valid(code: str) -> bool:
-        """Akceptuje pełny, konkretny kod ISCO-08 (poziom 4) ORAZ kod
-        niedoprecyzowany - prefiks o długości 1-3 cyfr dopełniony zerami do
-        4 cyfr (np. 5200 = grupa 52, nieustalona dokładna cyfra), analogicznie
-        do opcji "Brak możliwości ustalenia dokładnej cyfry" w module B/C
-        i w kodowaniu kaskadowym."""
-        if code in valid_final_codes:
-            return True
-        if code.endswith("000") and code[:1] in valid_level1_codes:
-            return True
-        if code.endswith("00") and not code.endswith("000") and code[:2] in valid_level2_codes:
-            return True
-        if code.endswith("0") and not code.endswith("00") and code[:3] in valid_level3_codes:
-            return True
-        return False
 
     if st.button(
         "Zapisz pełny kod i przejdź dalej",
@@ -2395,7 +2889,7 @@ def render_manual_step(df, idx: int, row, df_state_key: str = "manual_df", idx_s
     ):
         if not (len(direct_code) == 4 and direct_code.isdigit()):
             st.warning("Wpisz 4 cyfry kodu ISCO-08.")
-        elif not _direct_code_is_valid(direct_code):
+        elif not _direct_code_is_valid(direct_code, valid_final_codes, valid_level1_codes, valid_level2_codes, valid_level3_codes):
             st.warning(
                 "Podany kod nie występuje na liście kodów ISCO-08 i nie jest poprawnym "
                 "prefiksem dopełnionym zerami (np. 5200)."
@@ -2409,6 +2903,10 @@ def render_manual_step(df, idx: int, row, df_state_key: str = "manual_df", idx_s
 
     st.caption("Skrót: Ctrl+Enter (na macOS także Cmd+Enter) uruchamia główny przycisk bieżącego kroku.")
     _manual_ctrl_enter_shortcut(idx)
+    _instant_text_persistence(idx, [
+        ("Pełny kod ISCO-08", direct_code),
+        ("Uzasadnienie / komentarz do finalnej decyzji (opcjonalnie)", uzasadnienie),
+    ])
 
     col_back, col_next = st.columns(2)
     with col_back:
@@ -2426,7 +2924,13 @@ def render_manual_step(df, idx: int, row, df_state_key: str = "manual_df", idx_s
                 return
 
             chosen_code = label_to_code[choice]
-            if chosen_code == "__NO_MATCH__":
+            if chosen_code == "__UNCODABLE__":
+                _manual_save_uncodable(
+                    df, idx, target, uzasadnienie, df_state_key,
+                    idx_state_key, qualifying_positions,
+                )
+                st.rerun()
+            elif chosen_code == "__NO_MATCH__":
                 final_code = (prefix + "0" * (5 - level))[:4]
                 _manual_save_code(
                     df, idx, final_code, target, uzasadnienie, df_state_key,
@@ -2437,7 +2941,7 @@ def render_manual_step(df, idx: int, row, df_state_key: str = "manual_df", idx_s
                 digits.append(chosen_code[-1])
                 df.at[idx, f"ISCO_poziom{level}"] = chosen_code[-1]
                 df.at[idx, f"ISCO_poziom{level}_zmienne"] = ", ".join(selected_vars) if selected_vars else None
-                st.session_state[df_state_key] = df
+                _persist_df(df_state_key, df)
                 st.session_state[f"manual_step_{idx}"] = level + 1
                 st.rerun()
             else:
@@ -2460,7 +2964,7 @@ def render_classify_manual():
 
     st.markdown(
         '<h1 style="text-align:center; line-height:1.3;">Metoda A<br>'
-        '<span style="font-size:0.6em;">kodowanie ręczne</span></h1>',
+        '<span style="font-size:0.6em;">Kodowanie ręczne</span></h1>',
         unsafe_allow_html=True,
     )
     st.write(
@@ -2472,11 +2976,28 @@ def render_classify_manual():
     uploaded_file = st.file_uploader("Wybierz plik CSV", type=["csv"], key="uploader_manual")
 
     if uploaded_file is None:
-        st.session_state.pop("manual_df", None)
-        st.session_state.pop("manual_idx", None)
-        return
+        # Brak nowo wybranego pliku - to normalne zaraz po odświeżeniu strony
+        # (st.file_uploader zawsze wraca jako None po F5). Zanim skasujemy
+        # postęp, sprawdzamy, czy nie mamy zapisanego na dysku df z tej samej
+        # sesji roboczej (patrz _persist_df / _load_df_cache).
+        if "manual_df" not in st.session_state:
+            cached_df, cached_source = _load_df_cache("manual_df")
+            if cached_df is not None:
+                st.session_state["manual_df"] = cached_df
+                st.session_state["manual_source"] = cached_source
+                resume_target_manual = _get_coding_target("manual_df")
+                fallback_idx = _first_unfinished_idx(cached_df, resume_target_manual)
+                # Preferujemy DOKŁADNĄ pozycję zapamiętaną w URL (np. przypadek
+                # 99, jeśli koder tam właśnie był) nad "pierwszym nieukończonym" -
+                # patrz _set_idx / _restore_idx_from_query.
+                st.session_state[_frontier_key("manual_idx")] = _restore_frontier_from_query("manual_idx", fallback_idx)
+                _set_idx("manual_idx", _restore_idx_from_query("manual_idx", fallback_idx, len(cached_df)))
+        if "manual_df" not in st.session_state:
+            return
 
-    if "manual_df" not in st.session_state or st.session_state.get("manual_source") != uploaded_file.name:
+    if uploaded_file is not None and (
+        "manual_df" not in st.session_state or st.session_state.get("manual_source") != uploaded_file.name
+    ):
         df = read_csv_robust(uploaded_file)
         for col in ("B33", "B34", "B35", "B48", "B49", "B50"):
             if col not in df.columns:
@@ -2486,9 +3007,9 @@ def render_classify_manual():
         _init_manual_result_columns(df)
         resume_target_manual = _get_coding_target("manual_df")
         resume_idx = _first_unfinished_idx(df, resume_target_manual)
-        st.session_state["manual_df"] = df
-        st.session_state["manual_idx"] = resume_idx
+        _set_idx("manual_idx", resume_idx)
         st.session_state["manual_source"] = uploaded_file.name
+        _persist_df("manual_df", df, source_name=uploaded_file.name)
         if 0 < resume_idx < len(df):
             _, resume_rank, resume_total = _qualifying_progress(
                 _qualifying_positions(df, resume_target_manual), resume_idx, len(df)
@@ -2504,6 +3025,8 @@ def render_classify_manual():
     df = st.session_state["manual_df"]
     idx = st.session_state["manual_idx"]
     n = len(df)
+    if idx < n:
+        _restore_widget_drafts("manual_df", idx)
 
     resume_msg = st.session_state.pop("manual_resume_msg", None)
     if resume_msg:
@@ -2520,19 +3043,38 @@ def render_classify_manual():
     progress_fraction, progress_rank, progress_total = _qualifying_progress(qualifying_positions_manual, idx, n)
     st.progress(progress_fraction, text=f"{podmiot_label} {progress_rank} z {progress_total}")
 
+    _render_case_jumper(
+        qualifying_positions_manual, idx, "manual_idx",
+        key_suffix=f"manual_{mode_manual}",
+        on_jump=_manual_reset_idx,
+    )
+
     mode_suffix = "respondent" if mode_manual == "Respondent" else "partner"
 
     # Pozwala wrócić do ostatnio zakodowanego przypadku również po ukończeniu
     # całego pliku. Ponowny zapis po prostu nadpisuje poprzednią decyzję.
     previous_manual_idx = _prev_qualifying_idx(qualifying_positions_manual, idx)
-    if previous_manual_idx != idx:
-        if st.button("← Wróć do poprzedniego przypadku", key=f"manual_prev_case_{idx}"):
-            _manual_reset_idx(previous_manual_idx)
-            st.session_state["manual_idx"] = previous_manual_idx
+    col_prev, col_next = st.columns(2)
+    with col_prev:
+        if previous_manual_idx != idx:
+            if st.button("← Wróć do poprzedniego przypadku", key=f"manual_prev_case_{idx}", use_container_width=True):
+                _manual_reset_idx(previous_manual_idx)
+                _set_idx("manual_idx", previous_manual_idx)
+                st.rerun()
+    with col_next:
+        if _render_next_case_button(
+            qualifying_positions_manual, idx, "manual_idx", key_suffix=f"manual_{mode_manual}", on_jump=_manual_reset_idx
+        ):
             st.rerun()
 
     if idx < n:
         with st.expander(f"Pobierz częściowy wynik (dotychczasowy postęp: {progress_rank - 1} z {progress_total})"):
+            unfinished_manual = _unfinished_case_numbers(df, mode_manual, qualifying_positions_manual)
+            if unfinished_manual:
+                st.caption(
+                    f"Nieukończone numery przypadków ({len(unfinished_manual)}): "
+                    + ", ".join(str(n) for n in unfinished_manual)
+                )
             partial_csv, partial_xlsx = _build_csv_xlsx_bytes(df)
             col_pdl1, col_pdl2 = st.columns(2)
             with col_pdl1:
@@ -2603,6 +3145,7 @@ def render_classify_manual():
         st.markdown(f"**Wykształcenie:** {row[cols['wyksztalcenie']]}")
 
     render_manual_step(df, idx, row)
+    _persist_widget_drafts("manual_df", idx)
 
 
 # ============================================================
@@ -2680,13 +3223,13 @@ def render_pa_digit1_step(df, idx: int, row, df_state_key: str, idx_state_key: s
     target = _get_coding_target(df_state_key)
     qualifying_positions = _qualifying_positions(df, target)
 
-    col_next, col_prev = st.columns(2)
+    col_next = st.container()
     with col_next:
         if st.button(button_label, type="primary", use_container_width=True, key=f"pa1_next_{idx}"):
             df.at[idx, "Cyfra1_zatwierdzona_expert"] = "Tak" if is_confirm else "Nie"
             if not is_confirm and komentarz.strip():
                 df.at[idx, "Powod_odrzucenia_cyfry"] = komentarz.strip()
-            st.session_state[df_state_key] = df
+            _persist_df(df_state_key, df)
 
             if is_confirm:
                 df.at[idx, "ISCO_poziom1"] = proposed_code
@@ -2694,14 +3237,6 @@ def render_pa_digit1_step(df, idx: int, row, df_state_key: str, idx_state_key: s
             else:
                 st.session_state[f"hitl_wracal_{idx}"] = True
                 _start_cascade(idx)
-            st.rerun()
-    with col_prev:
-        prev_idx = _prev_qualifying_idx(qualifying_positions, idx)
-        prev_label = "← Poprzedni partner" if target == "Partner" else "← Poprzedni respondent"
-        if prev_idx != idx and st.button(prev_label, use_container_width=True, key=f"pa1_prev_{idx}"):
-            st.session_state[f"hitl_wracal_{prev_idx}"] = True
-            st.session_state.pop(f"pa1_confirmed_{prev_idx}", None)
-            st.session_state[idx_state_key] = prev_idx
             st.rerun()
 
 
@@ -2748,6 +3283,13 @@ def render_pa_top10_step(df, idx: int, row, prefix: str, df_state_key: str, idx_
     options.append(NO_DETERMINATION_OPTION)
     options.append(NO_CODE_OPTION)
 
+    _seed_top10_widgets(
+        df, idx, options,
+        radio_key=f"pa_top10_choice_{idx}",
+        direct_key=f"pa_top10_direct_code_{idx}",
+        uzasadnienie_key=f"pa_top10_uzasadnienie_{idx}",
+    )
+
     choice = st.radio(
         "Wybierz właściwy kod ISCO-08",
         options=options,
@@ -2781,7 +3323,7 @@ def render_pa_top10_step(df, idx: int, row, prefix: str, df_state_key: str, idx_
         # (patrz warunek `if pa1_confirmed:` w render_classify_hitl_1digit),
         # gdzie można ponownie zatwierdzić albo odrzucić przyporządkowaną cyfrę.
         df.at[idx, "Cyfra1_zatwierdzona_expert"] = None
-        st.session_state[df_state_key] = df
+        _persist_df(df_state_key, df)
         st.session_state.pop(f"pa1_confirmed_{idx}", None)
         st.session_state.pop(cache_key, None)
         st.rerun()
@@ -2797,7 +3339,6 @@ def render_pa_top10_step(df, idx: int, row, prefix: str, df_state_key: str, idx_
     st.markdown("**Lub wpisz od razu pełny, 4-cyfrowy kod ISCO-08:**")
     direct_code = st.text_input(
         "Pełny kod ISCO-08",
-        value="",
         max_chars=4,
         placeholder="",
         key=f"pa_top10_direct_code_{idx}",
@@ -2811,8 +3352,11 @@ def render_pa_top10_step(df, idx: int, row, prefix: str, df_state_key: str, idx_
     )
 
     valid_final_codes = set(load_embeddings_level(4)[3])
+    valid_level1_codes = set(load_embeddings_level(1)[3])
+    valid_level2_codes = set(load_embeddings_level(2)[3])
+    valid_level3_codes = set(load_embeddings_level(3)[3])
 
-    col_btn1, col_btn2 = st.columns(2)
+    col_btn1 = st.container()
     with col_btn1:
         if st.button("Zapisz i przejdź dalej", type="primary", use_container_width=True, key=f"pa_top10_save_{idx}"):
             if direct_code:
@@ -2821,8 +3365,11 @@ def render_pa_top10_step(df, idx: int, row, prefix: str, df_state_key: str, idx_
                 # zmienić zdanie i wpisać kod bezpośrednio.
                 if not (len(direct_code) == 4 and direct_code.isdigit()):
                     st.warning("Wpisz 4 cyfry kodu ISCO-08.")
-                elif direct_code not in valid_final_codes:
-                    st.warning("Podany kod nie występuje na liście kodów ISCO-08.")
+                elif not _direct_code_is_valid(direct_code, valid_final_codes, valid_level1_codes, valid_level2_codes, valid_level3_codes):
+                    st.warning(
+                        "Podany kod nie występuje na liście kodów ISCO-08 i nie jest poprawnym "
+                        "prefiksem dopełnionym zerami (np. 5200)."
+                    )
                 else:
                     df.at[idx, "ISCO_wybrany"] = direct_code
                     df.at[idx, "ISCO_poziom1"] = direct_code[0]
@@ -2835,10 +3382,10 @@ def render_pa_top10_step(df, idx: int, row, prefix: str, df_state_key: str, idx_
                     df.at[idx, "Brak_mozliwosci_zakodowania"] = None
                     df.at[idx, "Kodowany_podmiot"] = target
                     _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_top10_1_5", df_state_key=df_state_key)
-                    st.session_state[df_state_key] = df
+                    _persist_df(df_state_key, df)
                     st.session_state.pop(f"pa1_confirmed_{idx}", None)
                     st.session_state.pop(cache_key, None)
-                    st.session_state[idx_state_key] = _next_qualifying_idx(qualifying_positions, idx, n)
+                    _set_idx(idx_state_key, _next_idx_after_save(qualifying_positions, idx, idx_state_key, n))
                     st.rerun()
             elif is_uncodable:
                 df.at[idx, "Brak_mozliwosci_zakodowania"] = "Tak"
@@ -2846,10 +3393,10 @@ def render_pa_top10_step(df, idx: int, row, prefix: str, df_state_key: str, idx_
                     df.at[idx, "Uzasadnienie_finalne"] = uzasadnienie_top10.strip()
                 df.at[idx, "Kodowany_podmiot"] = target
                 _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_top10_1_5", df_state_key=df_state_key)
-                st.session_state[df_state_key] = df
+                _persist_df(df_state_key, df)
                 st.session_state.pop(f"pa1_confirmed_{idx}", None)
                 st.session_state.pop(cache_key, None)
-                st.session_state[idx_state_key] = _next_qualifying_idx(qualifying_positions, idx, n)
+                _set_idx(idx_state_key, _next_idx_after_save(qualifying_positions, idx, idx_state_key, n))
                 st.rerun()
             elif choice is None:
                 st.warning("Wybierz jedną opcję z listy albo wpisz kod ręcznie przed zapisaniem.")
@@ -2870,26 +3417,21 @@ def render_pa_top10_step(df, idx: int, row, prefix: str, df_state_key: str, idx_
                 df.at[idx, "Score_wybranego_kodu"] = score
                 df.at[idx, "Kodowany_podmiot"] = target
                 _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_top10_1_5", df_state_key=df_state_key)
-                st.session_state[df_state_key] = df
+                _persist_df(df_state_key, df)
                 st.session_state.pop(f"pa1_confirmed_{idx}", None)
                 st.session_state.pop(cache_key, None)
-                st.session_state[idx_state_key] = _next_qualifying_idx(qualifying_positions, idx, n)
+                _set_idx(idx_state_key, _next_idx_after_save(qualifying_positions, idx, idx_state_key, n))
                 st.rerun()
-    with col_btn2:
-        prev_idx = _prev_qualifying_idx(qualifying_positions, idx)
-        prev_label = "← Poprzedni partner" if target == "Partner" else "← Poprzedni respondent"
-        if prev_idx != idx and st.button(prev_label, use_container_width=True, key=f"pa_top10_prev_{idx}"):
-            st.session_state[f"hitl_wracal_{prev_idx}"] = True
-            st.session_state.pop(f"pa1_confirmed_{idx}", None)
-            st.session_state.pop(cache_key, None)
-            st.session_state[idx_state_key] = prev_idx
-            st.rerun()
 
     st.caption("Skrót: Ctrl+Enter (na macOS także Cmd+Enter) zapisuje wybór i przechodzi dalej.")
     _ctrl_enter_shortcut(
         handler_key="__paTop10CtrlEnterHandler",
         fallback_labels=["Zapisz i przejdź dalej"],
     )
+    _instant_text_persistence(idx, [
+        ("Pełny kod ISCO-08", direct_code),
+        ("Uzasadnienie / komentarz do wyboru (opcjonalnie)", uzasadnienie_top10),
+    ])
 
     st.write("")
     if st.button(
@@ -2900,11 +3442,22 @@ def render_pa_top10_step(df, idx: int, row, prefix: str, df_state_key: str, idx_
         # Zapisujemy ocenę pomocności listy 10 kodów, zanim koder przejdzie
         # do kodowania kaskadowego - inaczej ta ocena nigdy by się nie zapisała.
         df.at[idx, "Ocena_AI_top10_1_5"] = ai_helpfulness
-        st.session_state[df_state_key] = df
+        _persist_df(df_state_key, df)
         st.session_state.pop(f"pa1_confirmed_{idx}", None)
         st.session_state.pop(cache_key, None)
-        st.session_state[f"cascade_step_{idx}"] = 2
-        st.session_state[f"cascade_digits_{idx}"] = [prefix]
+        # Jeśli ten przypadek ma już zapisane kolejne cyfry (poziom 2-3) z
+        # wcześniejszej decyzji - np. koder wrócił, żeby coś poprawić - wizard
+        # wznawia się OD RAZU za ostatnią zapisaną cyfrą, zamiast zawsze od
+        # cyfry 2. Nigdy nie sięga do poziomu 4 (poza 1-4 nie ma sensu tutaj).
+        resume_digits = [prefix]
+        for level_col in ("ISCO_poziom2", "ISCO_poziom3"):
+            val = df.at[idx, level_col] if level_col in df.columns else None
+            if isinstance(val, str) and val.strip().isdigit():
+                resume_digits.append(val.strip())
+            else:
+                break
+        st.session_state[f"cascade_step_{idx}"] = len(resume_digits) + 1
+        st.session_state[f"cascade_digits_{idx}"] = resume_digits
         st.rerun()
 
 
@@ -2936,11 +3489,24 @@ def render_classify_hitl_1digit():
     uploaded_file = st.file_uploader("Wybierz plik CSV", type=["csv"], key="uploader_hitl_1digit")
 
     if uploaded_file is None:
-        st.session_state.pop("hitl1d_df", None)
-        st.session_state.pop("hitl1d_idx", None)
-        return
+        # Po odświeżeniu strony uploaded_file zawsze wraca jako None - próbujemy
+        # najpierw odtworzyć df z cache na dysku (patrz _load_df_cache), zanim
+        # skasujemy postęp kodowania.
+        if "hitl1d_df" not in st.session_state:
+            cached_df, cached_source = _load_df_cache("hitl1d_df")
+            if cached_df is not None:
+                st.session_state["hitl1d_df"] = cached_df
+                st.session_state["hitl1d_source"] = cached_source
+                resume_target_1d = _get_coding_target("hitl1d_df")
+                fallback_idx = _first_unfinished_idx(cached_df, resume_target_1d)
+                st.session_state[_frontier_key("hitl1d_idx")] = _restore_frontier_from_query("hitl1d_idx", fallback_idx)
+                _set_idx("hitl1d_idx", _restore_idx_from_query("hitl1d_idx", fallback_idx, len(cached_df)))
+        if "hitl1d_df" not in st.session_state:
+            return
 
-    if "hitl1d_df" not in st.session_state or st.session_state.get("hitl1d_source") != uploaded_file.name:
+    if uploaded_file is not None and (
+        "hitl1d_df" not in st.session_state or st.session_state.get("hitl1d_source") != uploaded_file.name
+    ):
         df = read_csv_robust(uploaded_file)
 
         required_cols = ["B33", "B34", "B35", "B48", "B49", "B50"] + list(PA_DIGIT_COLUMNS.values())
@@ -3022,9 +3588,9 @@ def render_classify_hitl_1digit():
 
         resume_target_1d = _get_coding_target("hitl1d_df")
         resume_idx = _first_unfinished_idx(df, resume_target_1d)
-        st.session_state["hitl1d_df"] = df
-        st.session_state["hitl1d_idx"] = resume_idx
+        _set_idx("hitl1d_idx", resume_idx)
         st.session_state["hitl1d_source"] = uploaded_file.name
+        _persist_df("hitl1d_df", df, source_name=uploaded_file.name)
         if 0 < resume_idx < len(df):
             _, resume_rank, resume_total = _qualifying_progress(
                 _qualifying_positions(df, resume_target_1d), resume_idx, len(df)
@@ -3040,6 +3606,8 @@ def render_classify_hitl_1digit():
     df = st.session_state["hitl1d_df"]
     idx = st.session_state["hitl1d_idx"]
     n = len(df)
+    if idx < n:
+        _restore_widget_drafts("hitl1d_df", idx)
 
     resume_msg = st.session_state.pop("hitl1d_resume_msg", None)
     if resume_msg:
@@ -3054,6 +3622,22 @@ def render_classify_hitl_1digit():
     progress_fraction, progress_rank, progress_total = _qualifying_progress(qualifying_positions_1d, idx, n)
     st.progress(progress_fraction, text=f"{podmiot_label} {progress_rank} z {progress_total}")
 
+    _render_case_jumper(qualifying_positions_1d, idx, "hitl1d_idx", key_suffix=f"hitl1d_{mode_1digit}")
+
+    previous_1d_idx = _prev_qualifying_idx(qualifying_positions_1d, idx)
+    prev_label_1d_top = "← Poprzedni partner" if mode_1digit == "Partner" else "← Poprzedni respondent"
+    col_prev_1d_top, col_next_1d_top = st.columns(2)
+    with col_prev_1d_top:
+        if previous_1d_idx != idx:
+            if st.button(prev_label_1d_top, key=f"hitl1d_prev_case_top_{idx}", use_container_width=True):
+                st.session_state[f"hitl_wracal_{previous_1d_idx}"] = True
+                st.session_state.pop(f"pa1_confirmed_{idx}", None)
+                _set_idx("hitl1d_idx", previous_1d_idx)
+                st.rerun()
+    with col_next_1d_top:
+        if _render_next_case_button(qualifying_positions_1d, idx, "hitl1d_idx", key_suffix=f"hitl1d_top_{mode_1digit}"):
+            st.rerun()
+
     mode_suffix = "respondent" if mode_1digit == "Respondent" else "partner"
 
     # Pobranie CZĘŚCIOWEGO wyniku - dostępne cały czas w trakcie kodowania
@@ -3063,6 +3647,12 @@ def render_classify_hitl_1digit():
     # nieukończonej osoby (patrz _first_unfinished_idx).
     if idx < n:
         with st.expander(f"Pobierz częściowy wynik (dotychczasowy postęp: {progress_rank - 1} z {progress_total})"):
+            unfinished_1d = _unfinished_case_numbers(df, mode_1digit, qualifying_positions_1d)
+            if unfinished_1d:
+                st.caption(
+                    f"Nieukończone numery przypadków ({len(unfinished_1d)}): "
+                    + ", ".join(str(n) for n in unfinished_1d)
+                )
             partial_csv, partial_xlsx = _build_csv_xlsx_bytes(df)
             col_pdl1, col_pdl2 = st.columns(2)
             with col_pdl1:
@@ -3140,13 +3730,16 @@ def render_classify_hitl_1digit():
 
     if cascade_active:
         render_cascade_step(df, idx, row, df_state_key="hitl1d_df", idx_state_key="hitl1d_idx")
+        _persist_widget_drafts("hitl1d_df", idx)
         return
 
     if pa1_confirmed:
         render_pa_top10_step(df, idx, row, prefix=pa1_confirmed, df_state_key="hitl1d_df", idx_state_key="hitl1d_idx")
+        _persist_widget_drafts("hitl1d_df", idx)
         return
 
     render_pa_digit1_step(df, idx, row, df_state_key="hitl1d_df", idx_state_key="hitl1d_idx")
+    _persist_widget_drafts("hitl1d_df", idx)
 
 
 # ============================================================
@@ -3160,9 +3753,28 @@ LEVEL_LABELS = {
 }
 
 
-def _start_cascade(idx: int):
-    st.session_state[f"cascade_step_{idx}"] = 1
-    st.session_state[f"cascade_digits_{idx}"] = []
+def _start_cascade(idx: int, df=None) -> None:
+    """Rozpoczyna (albo wznawia) kaskadowe kodowanie dla przypadku `idx`.
+
+    Jeśli przekazano `df` i przypadek ma już zapisane wcześniejsze cyfry
+    (kolumny ISCO_poziom1-3) - np. koder wrócił do wcześniej zakodowanego
+    przypadku i chce doprecyzować/poprawić decyzję - wizard startuje od razu
+    na poziomie ZA OSTATNIĄ zapisaną cyfrą, z prefiksem już ustawionym,
+    zamiast zawsze zaczynać od poziomu 1. Celowo bierze pod uwagę tylko
+    poziomy 1-3 (nigdy 4) - level w kaskadzie musi mieścić się w 1-4
+    (LEVEL_LABELS / load_embeddings_level), więc nie ustawiamy tu poziomu 5."""
+    digits: list[str] = []
+    if df is not None:
+        for level_col in ("ISCO_poziom1", "ISCO_poziom2", "ISCO_poziom3"):
+            if level_col not in df.columns:
+                break
+            val = df.at[idx, level_col]
+            if isinstance(val, str) and val.strip().isdigit():
+                digits.append(val.strip())
+            else:
+                break
+    st.session_state[f"cascade_step_{idx}"] = len(digits) + 1
+    st.session_state[f"cascade_digits_{idx}"] = digits
 
 
 def _cancel_cascade(idx: int):
@@ -3193,9 +3805,9 @@ def _cascade_save_direct_code(
     if uzasadnienie.strip():
         df.at[idx, "Uzasadnienie_finalne"] = uzasadnienie.strip()
     _save_respondent_meta(df, idx, df_state_key=df_state_key)
-    st.session_state[df_state_key] = df
+    _persist_df(df_state_key, df)
     _cancel_cascade(idx)
-    st.session_state[idx_state_key] = _next_qualifying_idx(qualifying_positions, idx, len(df))
+    _set_idx(idx_state_key, _next_idx_after_save(qualifying_positions, idx, idx_state_key, len(df)))
 
 
 def _mark_first_interaction(idx: int):
@@ -3381,7 +3993,6 @@ def render_cascade_step(df, idx: int, row, df_state_key: str = "hitl_df", idx_st
             "Cofnij się o krok i wybierz inną cyfrę."
         )
         selected_vars = []
-        uzasadnienie = ""
         ai_helpfulness = None
         choice = None
         is_no_determination = False
@@ -3421,10 +4032,14 @@ def render_cascade_step(df, idx: int, row, df_state_key: str = "hitl_df", idx_st
         selected_vars = [c for c in clicked_cols if c in source_cols]
 
         _render_selected_vars_caption(row, var_meta, selected_vars)
+        _render_previously_used_vars_caption(df, idx, selected_vars)
 
-        # Komentarz i ocena AI pojawiają się tylko na ostatnim FAKTYCZNIE
-        # osiągniętym poziomie szczegółowości: albo poziom 4, albo moment
-        # wyboru "brak możliwości ustalenia dokładnej cyfry" (koniec kodowania).
+        # Ocena AI pojawia się tylko na ostatnim FAKTYCZNIE osiągniętym
+        # poziomie szczegółowości: albo poziom 4, albo moment wyboru "brak
+        # możliwości ustalenia dokładnej cyfry" (koniec kodowania). Pole
+        # uzasadnienia jest jedno, wspólne dla obu ścieżek zapisu (wybór z
+        # listy i wpisanie kodu ręcznie) - patrz `direct_uzasadnienie` niżej,
+        # więc nie duplikujemy go tutaj.
         show_uzasadnienie = level == 4 or is_no_determination or is_uncodable
         if show_uzasadnienie:
             ai_helpfulness = st.slider(
@@ -3434,19 +4049,17 @@ def render_cascade_step(df, idx: int, row, df_state_key: str = "hitl_df", idx_st
                 value=3,
                 key=f"cascade_ai_helpfulness_{idx}_{level}_{prefix}",
             )
-            uzasadnienie = st.text_area(
-                "Uzasadnienie / komentarz do finalnej decyzji (opcjonalnie)",
-                key=f"cascade_uzasadnienie_{idx}_{level}_{prefix}",
-                height=70,
-            )
         else:
-            uzasadnienie = ""
             ai_helpfulness = None
 
     st.markdown("**Lub wpisz od razu pełny, 4-cyfrowy kod ISCO-08:**")
+    _seed_direct_code_and_uzasadnienie(
+        df, idx,
+        direct_key=f"cascade_direct_code_{idx}",
+        uzasadnienie_key=f"cascade_direct_uzasadnienie_{idx}",
+    )
     direct_code = st.text_input(
         "Pełny kod ISCO-08",
-        value="",
         max_chars=4,
         placeholder="",
         key=f"cascade_direct_code_{idx}",
@@ -3454,10 +4067,13 @@ def render_cascade_step(df, idx: int, row, df_state_key: str = "hitl_df", idx_st
     ).strip()
     direct_uzasadnienie = st.text_area(
         "Uzasadnienie / komentarz do finalnej decyzji (opcjonalnie)",
-        key=f"cascade_direct_uzasadnienie_{idx}_{level}_{prefix}",
+        key=f"cascade_direct_uzasadnienie_{idx}",
         height=70,
     )
     valid_final_codes = set(load_embeddings_level(4)[3])
+    valid_level1_codes = set(load_embeddings_level(1)[3])
+    valid_level2_codes = set(load_embeddings_level(2)[3])
+    valid_level3_codes = set(load_embeddings_level(3)[3])
     if st.button(
         "Zapisz pełny kod i przejdź dalej",
         type="primary",
@@ -3466,8 +4082,11 @@ def render_cascade_step(df, idx: int, row, df_state_key: str = "hitl_df", idx_st
     ):
         if not (len(direct_code) == 4 and direct_code.isdigit()):
             st.warning("Wpisz 4 cyfry kodu ISCO-08.")
-        elif direct_code not in valid_final_codes:
-            st.warning("Podany kod nie występuje na liście kodów ISCO-08.")
+        elif not _direct_code_is_valid(direct_code, valid_final_codes, valid_level1_codes, valid_level2_codes, valid_level3_codes):
+            st.warning(
+                "Podany kod nie występuje na liście kodów ISCO-08 i nie jest poprawnym "
+                "prefiksem dopełnionym zerami (np. 5200)."
+            )
         else:
             _cascade_save_direct_code(
                 df, idx, direct_code, target, direct_uzasadnienie,
@@ -3506,8 +4125,8 @@ def render_cascade_step(df, idx: int, row, df_state_key: str = "hitl_df", idx_st
                 rank, score = _get_rank_and_score(candidates, chosen_code)
                 df.at[idx, f"ISCO_poziom{level}_ranking_pozycja"] = rank
                 df.at[idx, f"ISCO_poziom{level}_score"] = score
-                if show_uzasadnienie and uzasadnienie:
-                    df.at[idx, "Uzasadnienie_finalne"] = uzasadnienie.strip()
+                if show_uzasadnienie and direct_uzasadnienie.strip():
+                    df.at[idx, "Uzasadnienie_finalne"] = direct_uzasadnienie.strip()
 
                 # Zaznaczenie kolumn w tabeli "Dane respondenta" NIE resetuje się
                 # przy przejściu na kolejny poziom kaskady (_resp_table_key nie
@@ -3522,9 +4141,9 @@ def render_cascade_step(df, idx: int, row, df_state_key: str = "hitl_df", idx_st
                     df.at[idx, "Brak_mozliwosci_zakodowania"] = "Tak"
                     df.at[idx, "Kodowany_podmiot"] = target
                     _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_kaskadowo_1_5", df_state_key=df_state_key)
-                    st.session_state[df_state_key] = df
+                    _persist_df(df_state_key, df)
                     _cancel_cascade(idx)
-                    st.session_state[idx_state_key] = _next_qualifying_idx(qualifying_positions, idx, n)
+                    _set_idx(idx_state_key, _next_idx_after_save(qualifying_positions, idx, idx_state_key, n))
                     st.rerun()
                 elif is_no_determination:
                     fill_count = 4 - len(digits)
@@ -3538,9 +4157,9 @@ def render_cascade_step(df, idx: int, row, df_state_key: str = "hitl_df", idx_st
                     df.at[idx, "ISCO_wybrany"] = final_code
                     df.at[idx, "Kodowany_podmiot"] = target
                     _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_kaskadowo_1_5", df_state_key=df_state_key)
-                    st.session_state[df_state_key] = df
+                    _persist_df(df_state_key, df)
                     _cancel_cascade(idx)
-                    st.session_state[idx_state_key] = _next_qualifying_idx(qualifying_positions, idx, n)
+                    _set_idx(idx_state_key, _next_idx_after_save(qualifying_positions, idx, idx_state_key, n))
                     st.rerun()
                 else:
                     new_digit = chosen_code[-1]
@@ -3556,12 +4175,13 @@ def render_cascade_step(df, idx: int, row, df_state_key: str = "hitl_df", idx_st
                         df.at[idx, "ISCO_wybrany"] = final_code
                         df.at[idx, "Kodowany_podmiot"] = target
                         _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_kaskadowo_1_5", df_state_key=df_state_key)
-                        st.session_state[df_state_key] = df
+                        _persist_df(df_state_key, df)
                         _cancel_cascade(idx)
-                        st.session_state[idx_state_key] = _next_qualifying_idx(qualifying_positions, idx, n)
+                        _set_idx(idx_state_key, _next_idx_after_save(qualifying_positions, idx, idx_state_key, n))
                         st.rerun()
                     else:
-                        st.session_state[df_state_key] = df
+                        df.at[idx, f"ISCO_poziom{level}"] = new_digit
+                        _persist_df(df_state_key, df)
                         st.session_state[f"cascade_step_{idx}"] = level + 1
                         st.rerun()
 
@@ -3576,6 +4196,10 @@ def render_cascade_step(df, idx: int, row, df_state_key: str = "hitl_df", idx_st
         direct_input_aria_label="Pełny kod ISCO-08",
         direct_save_label="Zapisz pełny kod i przejdź dalej",
     )
+    _instant_text_persistence(idx, [
+        ("Pełny kod ISCO-08", direct_code),
+        ("Uzasadnienie / komentarz do finalnej decyzji (opcjonalnie)", direct_uzasadnienie),
+    ])
 
 
 @st.dialog("Szczegóły zmiennej")
@@ -3610,6 +4234,188 @@ def _show_variable_dialog(col: str, raw_val, label: str, value_labels: dict):
                 st.markdown(f"➡️ **{k} = {v}**")
             else:
                 st.markdown(f"{k} = {v}")
+
+
+def _direct_code_is_valid(code: str, valid_final_codes, valid_level1_codes, valid_level2_codes, valid_level3_codes) -> bool:
+    """Akceptuje pełny, konkretny kod ISCO-08 (poziom 4) ORAZ kod
+    niedoprecyzowany - prefiks o długości 1-3 cyfr dopełniony zerami do
+    4 cyfr (np. 5200 = grupa 52, nieustalona dokładna cyfra), analogicznie
+    do opcji "Brak możliwości ustalenia dokładnej cyfry" w kodowaniu
+    kaskadowym. Wspólna dla Metody A i pól "wpisz od razu pełny kod" w
+    module B/C, żeby zasady walidacji były wszędzie identyczne."""
+    if code in valid_final_codes:
+        return True
+    if code.endswith("000") and code[:1] in valid_level1_codes:
+        return True
+    if code.endswith("00") and not code.endswith("000") and code[:2] in valid_level2_codes:
+        return True
+    if code.endswith("0") and not code.endswith("00") and code[:3] in valid_level3_codes:
+        return True
+    return False
+
+
+def _previously_used_vars(df, idx: int) -> list[str]:
+    """Odtwarza listę zmiennych (kolumn), z których koder korzystał przy
+    ostatniej decyzji dla tego przypadku - na podstawie zapisanych kolumn
+    ISCO_poziomX_zmienne. Używane WYŁĄCZNIE do wyświetlenia (read-only
+    caption) - nie da się nią przywrócić samego zaznaczenia w tabeli
+    (Streamlit blokuje programową zmianę stanu widgetu st.dataframe z
+    on_select), ale koder może chociaż zobaczyć, czego używał poprzednio."""
+    cols: list[str] = []
+    seen = set()
+    for level in (1, 2, 3, 4):
+        col = f"ISCO_poziom{level}_zmienne"
+        if col not in df.columns:
+            continue
+        val = df.at[idx, col]
+        if isinstance(val, str) and val.strip():
+            for v in val.split(","):
+                v = v.strip()
+                if v and v not in seen:
+                    seen.add(v)
+                    cols.append(v)
+    return cols
+
+
+def _render_previously_used_vars_caption(df, idx: int, live_selected_vars: list[str]) -> None:
+    """Pokazuje (jeśli nic nie jest aktualnie zaznaczone w tabeli) listę
+    zmiennych użytych przy poprzedniej decyzji dla tego przypadku - żeby
+    koder wracający do już zakodowanego przypadku widział, czego wcześniej
+    użył, nawet gdy samo zaznaczenie w tabeli się nie przywróciło."""
+    if live_selected_vars:
+        return
+    previous = _previously_used_vars(df, idx)
+    if previous:
+        st.caption("Poprzednio użyte zmienne (z ostatniej decyzji dla tego przypadku): " + ", ".join(previous))
+
+
+def _saved_answer(df, idx: int) -> dict:
+    """Zwraca poprzednio zapisaną decyzję dla wiersza (kod + uzasadnienie),
+    jeśli istnieje - używane do przywrócenia widoku (wybór na liście top-10,
+    pole 'Uzasadnienie') po powrocie do już zakodowanego przypadku."""
+    code = df.at[idx, "ISCO_wybrany"] if "ISCO_wybrany" in df.columns else None
+    uzasadnienie = df.at[idx, "Uzasadnienie_finalne"] if "Uzasadnienie_finalne" in df.columns else None
+    return {
+        "code": code if isinstance(code, str) and code.strip() else None,
+        "uzasadnienie": uzasadnienie if isinstance(uzasadnienie, str) and uzasadnienie.strip() else "",
+    }
+
+
+def _seed_top10_widgets(df, idx: int, options: list[str], radio_key: str, direct_key: str, uzasadnienie_key: str) -> None:
+    """Przywraca stan widgetów kroku top-10 (wybór z listy / kod wpisany
+    ręcznie / uzasadnienie) na podstawie ostatnio zapisanej decyzji dla tego
+    przypadku - ale TYLKO jeśli żaden z widgetów nie ma jeszcze stanu w
+    bieżącej sesji (żeby nie nadpisywać tego, co koder właśnie klika)."""
+    saved = _saved_answer(df, idx)
+    if radio_key not in st.session_state and saved["code"]:
+        # Etykiety opcji mają format "**<kod>** — ..." (patrz _format_candidate_label) -
+        # dopasowanie musi uwzględniać markdown pogrubienia, inaczej nigdy nie trafi.
+        matched = next((opt for opt in options if opt.startswith(f"**{saved['code']}**")), None)
+        if matched:
+            st.session_state[radio_key] = matched
+        elif direct_key not in st.session_state:
+            # Zapisany kod nie znalazł się wśród aktualnych propozycji top-10
+            # (np. inna kolejność rankingu) - pokazujemy go w polu na kod wpisany
+            # ręcznie, żeby koder od razu widział swoją poprzednią decyzję.
+            st.session_state[direct_key] = saved["code"]
+    if uzasadnienie_key not in st.session_state and saved["uzasadnienie"]:
+        st.session_state[uzasadnienie_key] = saved["uzasadnienie"]
+
+
+def _seed_direct_code_and_uzasadnienie(df, idx: int, direct_key: str, uzasadnienie_key: str) -> None:
+    """Jak _seed_top10_widgets, ale dla ekranów bez listy top-10 (Metoda A,
+    kaskada) - przywraca pole 'pełny kod ISCO-08' i pole uzasadnienia na
+    podstawie ostatnio zapisanej decyzji, jeśli widgety jeszcze nie mają
+    stanu w bieżącej sesji."""
+    saved = _saved_answer(df, idx)
+    if direct_key not in st.session_state and saved["code"]:
+        st.session_state[direct_key] = saved["code"]
+    if uzasadnienie_key not in st.session_state and saved["uzasadnienie"]:
+        st.session_state[uzasadnienie_key] = saved["uzasadnienie"]
+
+
+# Prefiksy kluczy widgetów, których BIEŻĄCY (jeszcze niezapisany) stan wolno
+# zrzucić na dysk i odtworzyć po odświeżeniu strony (patrz
+# _persist_widget_drafts / _restore_widget_drafts). Świadomie NIE obejmuje:
+# - przycisków (st.button) - odtworzenie ich stanu mogłoby fałszywie ponownie
+#   wywołać akcję (np. zapis albo start kaskady) zaraz po odświeżeniu;
+# - "resp_table_" (zaznaczenie kolumn w st.dataframe z on_select) - Streamlit
+#   BLOKUJE programowe ustawianie stanu tego typu widgetu przez
+#   st.session_state (StreamlitValueAssignmentNotAllowedError), więc nie da
+#   się go w ten sposób przywrócić.
+# "manual_step_"/"manual_digits_" i "cascade_step_"/"cascade_digits_" to
+# ZWYKŁE zmienne w session_state (nie klucze widgetów), więc programowe
+# ustawienie ich przez session_state jest bezpieczne - dzięki temu poziom
+# kaskady (i dotychczas wybrane cyfry), na którym koder akurat jest, też
+# przetrwa odświeżenie strony, zamiast zawsze wracać do poziomu 1.
+DRAFT_KEY_PREFIXES = (
+    "hitl_choice_", "hitl_direct_code_", "hitl_uzasadnienie_", "hitl_ai_helpfulness_",
+    "pa_top10_choice_", "pa_top10_direct_code_", "pa_top10_uzasadnienie_", "pa_top10_ai_helpfulness_",
+    "pa1_decision_", "pa1_komentarz_",
+    "manual_direct_code_", "manual_uzasadnienie_", "manual_choice_",
+    "manual_step_", "manual_digits_",
+    "cascade_choice_", "cascade_direct_code_", "cascade_uzasadnienie_",
+    "cascade_direct_uzasadnienie_", "cascade_ai_helpfulness_",
+    "cascade_step_", "cascade_digits_",
+)
+
+
+def _is_json_safe(value) -> bool:
+    try:
+        json.dumps(value)
+        return True
+    except (TypeError, ValueError):
+        return False
+
+
+def _draft_cache_path(df_state_key: str) -> Path:
+    username = st.session_state.get("username", "anon")
+    SESSION_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    return SESSION_CACHE_DIR / f"{username}_{df_state_key}_draft.json"
+
+
+def _persist_widget_drafts(df_state_key: str, idx: int) -> None:
+    """Zapisuje na dysk BIEŻĄCY, jeszcze niezapisany stan widgetów dla
+    przypadku `idx` - wybór z listy, wpisany tekst, zaznaczenia w tabeli -
+    żeby przetrwał odświeżenie strony (F5) w trakcie wypełniania, ZANIM koder
+    kliknie 'Zapisz'. Wywoływane na końcu renderowania strony, więc łapie
+    stan wszystkich pasujących widgetów utworzonych w tym przebiegu."""
+    id_pattern = re.compile(rf"(?:^|_){idx}(?:_|$)")
+    draft = {}
+    for key, value in st.session_state.items():
+        if not isinstance(key, str) or not key.startswith(DRAFT_KEY_PREFIXES):
+            continue
+        if not id_pattern.search(key):
+            continue
+        if _is_json_safe(value):
+            draft[key] = value
+    try:
+        _draft_cache_path(df_state_key).write_text(
+            json.dumps({"idx": idx, "values": draft}), encoding="utf-8"
+        )
+    except OSError:
+        pass
+
+
+def _restore_widget_drafts(df_state_key: str, idx: int) -> None:
+    """Odtwarza zapisany szkic (patrz _persist_widget_drafts) - TYLKO jeśli
+    dotyczy dokładnie tego samego przypadku `idx` (inaczej porzuca stary
+    szkic, żeby nie podstawić cudzych odpowiedzi pod inny przypadek) i tylko
+    dla kluczy, które nie mają jeszcze wartości w bieżącej sesji (czyli to
+    świeży start po odświeżeniu, a nie nadpisywanie czegoś, co koder właśnie
+    kliknął)."""
+    path = _draft_cache_path(df_state_key)
+    if not path.exists():
+        return
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return
+    if data.get("idx") != idx:
+        return
+    for key, value in data.get("values", {}).items():
+        if key not in st.session_state:
+            st.session_state[key] = value
 
 
 def _resp_table_key(idx: int, df_state_key: str) -> str:
@@ -3681,12 +4487,25 @@ def render_classify_hitl():
     uploaded_file = st.file_uploader("Wybierz plik CSV", type=["csv"], key="uploader_hitl")
 
     if uploaded_file is None:
-        st.session_state.pop("hitl_df", None)
-        st.session_state.pop("hitl_idx", None)
-        return
+        # Po odświeżeniu strony uploaded_file zawsze wraca jako None - próbujemy
+        # najpierw odtworzyć df z cache na dysku (patrz _load_df_cache), zanim
+        # skasujemy postęp kodowania.
+        if "hitl_df" not in st.session_state:
+            cached_df, cached_source = _load_df_cache("hitl_df")
+            if cached_df is not None:
+                st.session_state["hitl_df"] = cached_df
+                st.session_state["hitl_source"] = cached_source
+                resume_target_main = _get_coding_target("hitl_df")
+                fallback_idx = _first_unfinished_idx(cached_df, resume_target_main)
+                st.session_state[_frontier_key("hitl_idx")] = _restore_frontier_from_query("hitl_idx", fallback_idx)
+                _set_idx("hitl_idx", _restore_idx_from_query("hitl_idx", fallback_idx, len(cached_df)))
+        if "hitl_df" not in st.session_state:
+            return
 
     # Wczytanie pliku tylko raz (przy zmianie pliku resetujemy stan)
-    if "hitl_df" not in st.session_state or st.session_state.get("hitl_source") != uploaded_file.name:
+    if uploaded_file is not None and (
+        "hitl_df" not in st.session_state or st.session_state.get("hitl_source") != uploaded_file.name
+    ):
         df = read_csv_robust(uploaded_file)
         for col in ("B33", "B34", "B35", "B48", "B49", "B50"):
             if col not in df.columns:
@@ -3754,9 +4573,9 @@ def render_classify_hitl():
 
         resume_target_main = _get_coding_target("hitl_df")
         resume_idx = _first_unfinished_idx(df, resume_target_main)
-        st.session_state["hitl_df"] = df
-        st.session_state["hitl_idx"] = resume_idx
+        _set_idx("hitl_idx", resume_idx)
         st.session_state["hitl_source"] = uploaded_file.name
+        _persist_df("hitl_df", df, source_name=uploaded_file.name)
         if 0 < resume_idx < len(df):
             _, resume_rank, resume_total = _qualifying_progress(
                 _qualifying_positions(df, resume_target_main), resume_idx, len(df)
@@ -3772,6 +4591,8 @@ def render_classify_hitl():
     df = st.session_state["hitl_df"]
     idx = st.session_state["hitl_idx"]
     n = len(df)
+    if idx < n:
+        _restore_widget_drafts("hitl_df", idx)
 
     resume_msg = st.session_state.pop("hitl_resume_msg", None)
     if resume_msg:
@@ -3791,6 +4612,21 @@ def render_classify_hitl():
         with st.popover("Podgląd danych"):
             visible_df = visible_df_for_mode(df, mode_main)
             st.dataframe(visible_df, use_container_width=True, column_config=build_column_config(visible_df, load_var_metadata(mode_main)))
+
+    _render_case_jumper(qualifying_positions_main, idx, "hitl_idx", key_suffix=f"hitl_{mode_main}")
+
+    previous_hitl_idx = _prev_qualifying_idx(qualifying_positions_main, idx)
+    prev_label_top = "← Poprzedni partner" if mode_main == "Partner" else "← Poprzedni respondent"
+    col_prev_top, col_next_top = st.columns(2)
+    with col_prev_top:
+        if previous_hitl_idx != idx:
+            if st.button(prev_label_top, key=f"hitl_prev_case_top_{idx}", use_container_width=True):
+                st.session_state[f"hitl_wracal_{previous_hitl_idx}"] = True
+                _set_idx("hitl_idx", previous_hitl_idx)
+                st.rerun()
+    with col_next_top:
+        if _render_next_case_button(qualifying_positions_main, idx, "hitl_idx", key_suffix=f"hitl_top_{mode_main}"):
+            st.rerun()
 
     # Kolejność kolumn w eksporcie - ta sama zarówno dla wyniku KOŃCOWEGO
     # (po ukończeniu kodowania), jak i dla podglądu/pobrania CZĘŚCIOWEGO
@@ -3839,6 +4675,12 @@ def render_classify_hitl():
     # nieukończonej osoby (patrz _first_unfinished_idx).
     if idx < n:
         with st.expander(f"Pobierz częściowy wynik (dotychczasowy postęp: {progress_rank - 1} z {progress_total})"):
+            unfinished_main = _unfinished_case_numbers(df, mode_main, qualifying_positions_main)
+            if unfinished_main:
+                st.caption(
+                    f"Nieukończone numery przypadków ({len(unfinished_main)}): "
+                    + ", ".join(str(n) for n in unfinished_main)
+                )
             partial_csv, partial_xlsx = _build_csv_xlsx_bytes(export_df)
             col_pdl1, col_pdl2 = st.columns(2)
             with col_pdl1:
@@ -3917,6 +4759,7 @@ def render_classify_hitl():
 
     if cascade_active:
         render_cascade_step(df, idx, row)
+        _persist_widget_drafts("hitl_df", idx)
         return
 
     target = _get_coding_target("hitl_df")
@@ -3946,6 +4789,13 @@ def render_classify_hitl():
     NO_CODE_OPTION = "Brak możliwości zakodowania do kodu ISCO-08 (przejście do następnej osoby)"
     options = [_format_candidate_label(r.isco_code, r.title_pl, getattr(r, "title_en", ""), r.score) for r in ranking.itertuples()]
     options.append(NO_CODE_OPTION)
+
+    _seed_top10_widgets(
+        df, idx, options,
+        radio_key=f"hitl_choice_{idx}",
+        direct_key=f"hitl_direct_code_{idx}",
+        uzasadnienie_key=f"hitl_uzasadnienie_{idx}",
+    )
 
     choice = st.radio(
         "Wybierz właściwy kod ISCO-08",
@@ -3985,7 +4835,6 @@ def render_classify_hitl():
     st.markdown("**Lub wpisz od razu pełny, 4-cyfrowy kod ISCO-08:**")
     direct_code = st.text_input(
         "Pełny kod ISCO-08",
-        value="",
         max_chars=4,
         placeholder="",
         key=f"hitl_direct_code_{idx}",
@@ -3999,8 +4848,11 @@ def render_classify_hitl():
     )
 
     valid_final_codes = set(load_embeddings_level(4)[3])
+    valid_level1_codes = set(load_embeddings_level(1)[3])
+    valid_level2_codes = set(load_embeddings_level(2)[3])
+    valid_level3_codes = set(load_embeddings_level(3)[3])
 
-    col_btn1, col_btn2 = st.columns(2)
+    col_btn1 = st.container()
     with col_btn1:
         if st.button("Zapisz i przejdź dalej", type="primary", use_container_width=True):
             if direct_code:
@@ -4009,8 +4861,11 @@ def render_classify_hitl():
                 # zmienić zdanie i wpisać kod bezpośrednio.
                 if not (len(direct_code) == 4 and direct_code.isdigit()):
                     st.warning("Wpisz 4 cyfry kodu ISCO-08.")
-                elif direct_code not in valid_final_codes:
-                    st.warning("Podany kod nie występuje na liście kodów ISCO-08.")
+                elif not _direct_code_is_valid(direct_code, valid_final_codes, valid_level1_codes, valid_level2_codes, valid_level3_codes):
+                    st.warning(
+                        "Podany kod nie występuje na liście kodów ISCO-08 i nie jest poprawnym "
+                        "prefiksem dopełnionym zerami (np. 5200)."
+                    )
                 else:
                     df.at[idx, "ISCO_wybrany"] = direct_code
                     df.at[idx, "ISCO_poziom1"] = direct_code[0]
@@ -4023,8 +4878,8 @@ def render_classify_hitl():
                     df.at[idx, "Brak_mozliwosci_zakodowania"] = None
                     df.at[idx, "Kodowany_podmiot"] = target
                     _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_top10_1_5", df_state_key="hitl_df")
-                    st.session_state["hitl_df"] = df
-                    st.session_state["hitl_idx"] = _next_qualifying_idx(qualifying_positions, idx, n)
+                    _persist_df("hitl_df", df)
+                    _set_idx("hitl_idx", _next_idx_after_save(qualifying_positions, idx, "hitl_idx", n))
                     st.rerun()
             elif is_uncodable:
                 df.at[idx, "Brak_mozliwosci_zakodowania"] = "Tak"
@@ -4032,8 +4887,8 @@ def render_classify_hitl():
                     df.at[idx, "Uzasadnienie_finalne"] = uzasadnienie_top10.strip()
                 df.at[idx, "Kodowany_podmiot"] = target
                 _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_top10_1_5", df_state_key="hitl_df")
-                st.session_state["hitl_df"] = df
-                st.session_state["hitl_idx"] = _next_qualifying_idx(qualifying_positions, idx, n)
+                _persist_df("hitl_df", df)
+                _set_idx("hitl_idx", _next_idx_after_save(qualifying_positions, idx, "hitl_idx", n))
                 st.rerun()
             elif choice is None:
                 st.warning("Wybierz jedną opcję z listy albo wpisz kod ręcznie przed zapisaniem.")
@@ -4048,35 +4903,39 @@ def render_classify_hitl():
                 df.at[idx, "Score_wybranego_kodu"] = score
                 df.at[idx, "Kodowany_podmiot"] = target
                 _save_respondent_meta(df, idx, ai_helpfulness, ai_column="Ocena_AI_top10_1_5", df_state_key="hitl_df")
-                st.session_state["hitl_df"] = df
-                st.session_state["hitl_idx"] = _next_qualifying_idx(qualifying_positions, idx, n)
+                _persist_df("hitl_df", df)
+                _set_idx("hitl_idx", _next_idx_after_save(qualifying_positions, idx, "hitl_idx", n))
                 st.rerun()
-    with col_btn2:
-        prev_idx = _prev_qualifying_idx(qualifying_positions, idx)
-        prev_label = "← Poprzedni partner" if target == "Partner" else "← Poprzedni respondent"
-        if prev_idx != idx and st.button(prev_label, use_container_width=True):
-            st.session_state[f"hitl_wracal_{prev_idx}"] = True
-            st.session_state["hitl_idx"] = prev_idx
-            st.rerun()
 
     st.caption("Skrót: Ctrl+Enter (na macOS także Cmd+Enter) zapisuje wybór i przechodzi dalej.")
     _ctrl_enter_shortcut(
         handler_key="__hitlCtrlEnterHandler",
         fallback_labels=["Zapisz i przejdź dalej"],
     )
+    _instant_text_persistence(idx, [
+        ("Pełny kod ISCO-08", direct_code),
+        ("Uzasadnienie / komentarz do wyboru (opcjonalnie)", uzasadnienie_top10),
+    ])
 
     st.write("")
+    _cascade_start_label = (
+        "Popraw kodowanie kaskadowo (od ostatnio wybranej cyfry)"
+        if isinstance(df.at[idx, "ISCO_poziom1"], str) and df.at[idx, "ISCO_poziom1"].strip()
+        else "Zakoduj zawód od zera"
+    )
     if st.button(
-        "Zakoduj zawód od zera",
+        _cascade_start_label,
         key=f"cascade_start_{idx}",
         use_container_width=True,
     ):
         # Zapisujemy ocenę pomocności listy 10 kodów, zanim koder przejdzie
         # do kodowania kaskadowego - inaczej ta ocena nigdy by się nie zapisała.
         df.at[idx, "Ocena_AI_top10_1_5"] = ai_helpfulness
-        st.session_state["hitl_df"] = df
-        _start_cascade(idx)
+        _persist_df("hitl_df", df)
+        _start_cascade(idx, df=df)
         st.rerun()
+
+    _persist_widget_drafts("hitl_df", idx)
 
 
 # ============================================================
@@ -4099,6 +4958,8 @@ with st.sidebar:
     if st.button("Wyloguj", use_container_width=True):
         for key in ("authenticated", "username"):
             st.session_state.pop(key, None)
+        st.query_params.pop("u", None)
+        st.query_params.pop("p", None)
         st.session_state.page = "home"
         st.rerun()
 
