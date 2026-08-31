@@ -292,8 +292,8 @@ CUSTOM_CSS = f"""
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 3.2rem;
-    flex-wrap: nowrap;
+    gap: 2.4rem;
+    flex-wrap: wrap;
     padding: 0.2rem 0 0.9rem 0;
     margin-bottom: 0.8rem;
 }}
@@ -302,26 +302,29 @@ CUSTOM_CSS = f"""
     justify-content: center;
     align-items: center;
     min-width: 0;
+    flex: 0 1 auto;
 }}
 .logo-header__item img {{
     display: block;
-    max-width: 440px;
-    max-height: 136px;
+    max-width: 220px;
+    max-height: 90px;
     object-fit: contain;
 }}
 .logo-header__item--umcs img {{
-    max-width: 462px;
-    max-height: 143px;
+    max-width: 220px;
+    max-height: 90px;
 }}
 .logo-header__item--ifis img {{
-    max-height: 164px;
+    max-width: 220px;
+    max-height: 90px;
 }}
 .logo-header__item--lodz img {{
-    max-height: 164px;
+    max-width: 220px;
+    max-height: 90px;
 }}
 .logo-header__item--ess img {{
-    max-width: 1085px;
-    max-height: 336px;
+    max-width: 220px;
+    max-height: 90px;
 }}
 .login-panel {{
     max-width: 420px;
@@ -475,15 +478,12 @@ div[class*="st-key-questionnaire_table_"] div[data-testid="stColumn"]:last-child
         padding: 0.2rem 0 0.9rem 0;
     }}
     .logo-header__item img,
+    .logo-header__item--umcs img,
     .logo-header__item--ifis img,
-    .logo-header__item--lodz img {{
-        max-height: 116px;
-    }}
-    .logo-header__item--umcs img {{
-        max-height: 122px;
-    }}
+    .logo-header__item--lodz img,
     .logo-header__item--ess img {{
-        max-height: 286px;
+        max-width: 150px;
+        max-height: 60px;
     }}
 }}
 </style>
