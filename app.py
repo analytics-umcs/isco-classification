@@ -705,11 +705,9 @@ def _next_idx_after_save(qualifying_positions: list[int], idx: int, idx_state_ke
     właściwe miejsce w pliku). W przeciwnym razie - normalny postęp "do przodu"
     - przechodzi po prostu do kolejnego kwalifikującego się przypadku, jak
     dotychczas."""
-    next_seq = _next_qualifying_idx(qualifying_positions, idx, n)
-    frontier = st.session_state.get(_frontier_key(idx_state_key), idx)
-    if idx < frontier:
-        return frontier
-    return next_seq
+    # Zawsze po kolei: kolejny kwalifikujący się przypadek po bieżącym.
+    # Skoki wyłącznie ręcznie, przez _render_case_jumper.
+    return _next_qualifying_idx(qualifying_positions, idx, n)
 
 
 def _restore_idx_from_query(idx_state_key: str, fallback: int, n: int) -> int:
